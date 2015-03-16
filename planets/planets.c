@@ -446,12 +446,6 @@ int main(void) {
         if (index == 2) {
             continue; // skip Earth
         }
-        /* coord_sys: short int
-         * 0 = GCRS or "local GCRS"
-         * 1 = true equator and equinox of date
-         * 2 = true equator and CIO of date
-         * 3 = astrometric coordinates, i.e., without light deflection or aberration
-         */
         if ((error = place(timep.jd_tt, &obj[index], &obs_loc, timep.delta_t, coord_equ, 
                         accuracy, &t_place)) != 0) {
             printf("Error %d from place.", error);
@@ -467,7 +461,9 @@ int main(void) {
         if (az < 0.0) {
             az += 360.0;
         }
-        zd = 90.0 - zd;
+        /* ZA (zenith altitude) is degrees above horizon.
+         * ZD (zenith distance) is degrees below zenith. */
+        zd = 90.0 - zd; // convert ZD to ZA
         printf("%8s %15s %15s %15.12f %15s %15s\n", 
                obj[index].name, as_hms(ra_str, t_place.ra), 
                as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd), 
@@ -491,11 +487,10 @@ int main(void) {
         printf("Error %d in transit_coord.", error);
         return error;
     }
-    printf("{%15.10f %15.10f}\n", decr, rar);
+    printf("\nSolar transit: {%15.10f %15.10f}\n", decr, rar);
     tmp = rar - geo_loc.longitude;
-    printf("%15.10f\n", tmp);
-    tmp /= 15.0;
-    printf("%s\n", as_hms(ra_str, normalize(tmp, 24.0)));
+    printf("Transits observer: %15.10f degrees (%s)\n", tmp,
+            as_hms(ra_str, normalize(tmp / 15.0, 24.0)));
 
 #if !defined(USING_SOLSYSV2)
     ephem_close();  /* remove this line for use with solsys version 2 */
