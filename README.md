@@ -2,6 +2,30 @@
 
 Basic vector astronomy using NOVAS
 
+"The Naval Observatory Vector Astronomy Software (NOVAS) is a source-code
+library in Fortran, C and Python that provides common astrometric quantities
+and transformations. It can supply, in one or two function calls, the 
+instantaneous celestial position of any star or planet in a variety of 
+coordinate systems."
+_NOVAS C 3.1 Guide_
+
+This project uses the NOVAS C-library to calculate the sky positions of 
+the planets, Sun and Moon, from an observer at a fixed location on Earth.
+
+It leverages the general purpose planet ephemeris file DE430, published
+15-Aug-2013 by the National Aeronautics and Space Administration (NASA)
+Jet Propulsion Laboratory (JPL). Following the instructions below, you 
+will download the text files that make up DE430, along with Fortran
+code that parses these and produces a binary ephemeris file for your
+architecture. Once the binary DE430 is built and tested, you will use
+it to build an example program in the NOVAS C distribution.
+
+Finally, a small application included in this project, `planets`, can
+be built to demonstrate some of the capabilities of NOVAS.
+
+The NOVAS C distribution and JPL Ephemeris and utility software are
+free to download from the publishers. Neither is provided here.
+
 ### Instructions for creating binary JPL Ephemeris DE430
 
 These instructions were tested on FC19 and FC20 x86_64 Linux. 
@@ -26,12 +50,11 @@ Assumes that you have the typical GCC tools already
 
 ### Set Up Development Tree
 
-Starting from a directory where you keep your programming projects...
+Starting from this directory...
 
 ```
-mkdir -p astro/ephemeris/ascii/de430
-mkdir -p astro/ephemeris/fortran
-cd astro/
+mkdir -p ephemeris/ascii/de430
+mkdir -p ephemeris/fortran
 curl -O http://aa.usno.navy.mil/software/novas/novas_c/novasc3.1.tar.gz
 tar -xzf novasc3.1.tar.gz
 cd ephemeris/fortran
@@ -48,7 +71,7 @@ for p in $(curl --list-only ftp://ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/)
 
 `cd ../../fortran`
 
-The instructions in userguide.txt are authoritative. These instructions were
+The instructions in `userguide.txt` are authoritative. These instructions were
 derived from the instructions dated "24 March 2013".
 
 `vim testeph.f jplsubs.f`
@@ -75,12 +98,14 @@ In `jplsubs.f`, in `SUBROUTINE FSIZER3`, change the line:
        NRECL=
 ```
        
-To: (NOTE: Leading whitespace in Fortran is significant, so remove *one* of
-the indention spaces so it has a 6-space indention.)
+To:
 
 ```
       NRECL=4
 ```
+
+NOTE: Leading whitespace in Fortran is significant, so remove *one* of
+the indention spaces so it has a 6-space indention.
 
 Further down in `SUBROUTINE FSIZER3`, change the line:
 
@@ -94,7 +119,7 @@ To:
       KSIZE=2036
 ```
 
-Search for `CALL FSIZER3` and uncomment the line (delete the 'C' in col 1)
+Search for `CALL FSIZER3` and uncomment the line (by deleting the 'C' in column 1).
 
 Save and quit vim. Edit `asc2eph.f`
 
@@ -147,7 +172,6 @@ Set the environment to build in debug mode (optional)
 Build
 
 `make`
-
 
 ### Generate JPLEPH
 
