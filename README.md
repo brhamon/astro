@@ -26,7 +26,7 @@ be built to demonstrate some of the capabilities of NOVAS.
 The NOVAS C distribution and JPL Ephemeris and utility software are
 free to download from the publishers. Neither is provided here.
 
-[Screen shot of planets](demo.png)
+![Screen shot of planets](demo.png)
 
 ### Instructions for creating binary JPL Ephemeris DE430
 
