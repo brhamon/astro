@@ -117,6 +117,13 @@ typedef struct leap_second_t_ {
     double tai_utc;
 } leap_second_t;
 
+/*
+ * The following table is published by IERS, and is accurate through 31-Dec-2015,
+ * (which would be the next opportunity to add a leap second after the one scheduled
+ * for 30-Jun-2015).
+ *
+ * VERY IMPORTANT: Add new leap second entries *before* the dummy record at the end.
+ */
 static const leap_second_t leap_seconds[] = {
     { 1972, 1,  1, 2441317.5,  10.0 },
     { 1972, 7,  1, 2441499.5,  11.0 },
@@ -148,14 +155,21 @@ static const leap_second_t leap_seconds[] = {
     { 9999, 1,  1, 5373119.5,  36.0 },	// dummy end record
 };
 
+/*
+ * Find the number of leap seconds for a given JD UTC.
+ */
 double tai_utc(double jd_utc) {
     const leap_second_t* leap;
 
     for (leap = leap_seconds; leap[1].jd < jd_utc; ++leap)
-    ;
+        ;
     return leap->tai_utc;
 }
 
+/*
+ * While using NOVAS, you will need access to various representations
+ * of time. We place all in one structure to make it easier to maintain.
+ */
 typedef struct time_parameters_t_ {
     double jd_utc;
     double leapsecs;
@@ -164,6 +178,9 @@ typedef struct time_parameters_t_ {
     double delta_t;
 } time_parameters_t;
 
+/*
+ * Obtain the JD UTC from the system clock, with accuracy of 1.0 seconds.
+ */
 double get_jd_utc() {
     short int year = 2000;
     short int month = 1;
@@ -186,6 +203,10 @@ double get_jd_utc() {
     return julian_date(year,month,day,hour);
 }
 
+/*
+ * Initialize the time representations in tp, using the current JD UTC and
+ * instantaneous offset from UT1.
+ */
 void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc) {
     tp->jd_utc = jd_utc;
     tp->leapsecs = tai_utc(jd_utc);
@@ -199,24 +220,29 @@ void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc) 
 }
 
 /*
-   starname[SIZE_OF_OBJ_NAME] = name of celestial object
-   catalog[SIZE_OF_CAT_NAME]  = catalog designator (e.g., HIP)
-   starnumber                 = integer identifier assigned to object
-   ra                         = ICRS right ascension (hours)
-   dec                        = ICRS declination (degrees)
-   promora                    = ICRS proper motion in right ascension
-                                (milliarcseconds/year)
-   promodec                   = ICRS proper motion in declination
-                                (milliarcseconds/year)
-   parallax                   = parallax (milliarcseconds)
-   radialvelocity             = radial velocity (km/s)
-*/
+ * Put one star here for sanity checking. Polaris will always be within about 1
+ * degree of the Celestial Intermediate Pole (CIP).
+ *
+ * starname[SIZE_OF_OBJ_NAME] = name of celestial object
+ * catalog[SIZE_OF_CAT_NAME]  = catalog designator (e.g., HIP)
+ * starnumber                 = integer identifier assigned to object
+ * ra                         = ICRS right ascension (hours)
+ * dec                        = ICRS declination (degrees)
+ * promora                    = ICRS proper motion in right ascension
+ *                              (milliarcseconds/year)
+ * promodec                   = ICRS proper motion in declination
+ *                              (milliarcseconds/year)
+ * parallax                   = parallax (milliarcseconds)
+ * radialvelocity             = radial velocity (km/s)
+ */
 static cat_entry polaris_cat = {"POLARIS", "HIP",   0,  2.530301028,  89.264109444,
                44.22, -11.75,  7.56, -17.4};
 
 /*
-   Greenwich and local apparent sidereal time and Earth Rotation Angle.
-*/
+ * Display Greenwich and local apparent sidereal time and Earth Rotation Angle.
+ *
+ * These values help explain the instantaneous transalation between ICRS and ITRS.
+ */
 short int display_rotation(time_parameters_t* tp, on_surface* lp, short int accuracy) {
     short int error;
     double last, gast, theta;
@@ -241,6 +267,10 @@ short int display_rotation(time_parameters_t* tp, on_surface* lp, short int accu
 }
 
 #if defined(USING_SOLSYSV2)
+/*
+ * Read the title string that appears at the beginning of every JPL binary ephemeris
+ * file.
+ */
 int get_eph_title(char* out_str, int out_len, const char* eph_name)
 {
     ssize_t cnt;
@@ -259,6 +289,10 @@ int get_eph_title(char* out_str, int out_len, const char* eph_name)
 }
 #endif
 
+/*
+ * Calculate the 'Transit coordinates' for a solar system object.
+ * This is the location on Earth at which the object is at local zenith.
+ */
 short int transit_coord(time_parameters_t* tp, object* obj, 
         double x_pole, double y_pole,
         short int accuracy, 
@@ -303,21 +337,10 @@ double normalize(double val, double period)
 }
 
 int main(void) {
-/* Use the following link to access Earth Orientation "Bulletin A".
-* http://maia.usno.navy.mil/ser7/finals2000A.daily
-*
-* Value   Col.#    Format  Quantity
-* -----   -------  ------  ------------------------------
-* x_pole  19-27    F9.6    Bull. A PM-x (sec. of arc)
-* y_pole  38-46    F9.6    Bull. A PM-y (sec. of arc)
-* ut1_utc 59-68    F10.7   Bull. A UT1-UTC (sec. of time)
-*
-* Description of fields:
-* http://maia.usno.navy.mil/ser7/readme.finals2000A
-*/
 /*
-15 3 7 57088.00 I  0.005165 0.000148  0.366089 0.000099  I-0.5340900 0.0000552                 P    -0.038    0.239     0.154    0.600
-*/
+ * The following three values are Earth Orientation (EO) paramters published by IERS.
+ * See bull_a.c for more information.
+ */
     double x_pole = 0.005165;
     double y_pole = 0.366089;
     double ut1_utc = -0.5340900;
@@ -328,16 +351,10 @@ int main(void) {
     short int de_num = 0;
 #endif
 
-#if 1
-    /* Ballard: lat=47.6062095&lon=-122.3320708 */
-    const double latitude = 47.62223243;
-    const double longitude = -122.3634567;
-#else
-    /* Lowell, MA: lat=42.6369744 lon=-71.3268609 */
-    const double latitude = 42.6369744;
-    const double longitude = -71.3268609;
-#endif
-    const double height = 100.0;
+    /* Some location in Seattle. REPLACE WITH YOUR LOCATION. */
+    const double latitude = 47.6096694;
+    const double longitude = -122.340412;
+    const double height = 10.0;
     const double temperature = 15.0;
     const double pressure = 1026.4;
 
@@ -446,13 +463,6 @@ int main(void) {
          */
         equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc, 
                 t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
-#if 0
-        zd = 180.0 - zd;
-        az = 360.0 - az; /* this inversion is optional... planetariums don't do this */
-
-        printf("%8s %15.10f %15.10f %15.12f %15.10f %15.10f\n", 
-               obj[index].name, t_place.ra, t_place.dec, t_place.dis, zd, az);
-#else
         az -= 180.0;
         if (az < 0.0) {
             az += 360.0;
@@ -462,7 +472,6 @@ int main(void) {
                obj[index].name, as_hms(ra_str, t_place.ra), 
                as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd), 
                as_dms(az_str, az));
-#endif
     }
 
     if ((error = place(timep.jd_tt, &polaris, &obs_loc, timep.delta_t, coord_equ, 
@@ -472,7 +481,6 @@ int main(void) {
     }
     equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
             t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
-//    zd = zd - 90.0;
     printf("%8s %15s %15s %15.12f %15s %15s\n",
             polaris_cat.starname, as_hms(ra_str, t_place.ra),
             as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd),
