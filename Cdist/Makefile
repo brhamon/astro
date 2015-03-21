@@ -1,0 +1,60 @@
+CC = gcc
+FC = gcc
+BUILD ?= debug
+CFLAGS = -Wall -Wextra
+LDFLAGS = -lm -lgfortran
+
+TARGETS = checkout-stars example
+CKS_SOURCES = checkout-stars.c
+EX_SOURCES = example.c
+
+CKS_OBJECTS = $(CKS_SOURCES:%.c=%.o)
+EX_OBJECTS = $(EX_SOURCES:%.c=%.o)
+
+LIBNAME = novas.a
+SOURCES = novas.c novascon.c nutation.c solsys2.c readeph0.c
+FSOURCES = jplint.f jplsubs.f
+FOBJECTS = $(FSOURCES:%.f=%.o)
+OBJECTS = $(SOURCES:%.c=%.o)
+
+# ar r $(LIBNAME) $(OBJECTS) $(FOBJECTS)
+
+ifeq ($(BUILD),debug)
+CFLAGS += -g
+FFLAGS += -g
+else
+ifeq ($(BUILD),release)
+CFLAGS += -O3 -DNDEBUG
+FFLAGS += -O3 -DNDEBUG
+endif
+endif
+
+.PHONY: all clean
+
+all: $(TARGETS)
+
+checkout-stars: $(CKS_OBJECTS) $(LIBNAME)
+
+example: $(EX_OBJECTS) $(LIBNAME)
+
+$(LIBNAME): $(OBJECTS) $(FOBJECTS)
+	ar r $(LIBNAME) $(OBJECTS) $(FOBJECTS)
+
+clean:
+	@rm -f $(TARGET) $(CKS_OBJECTS) $(EX_OBJECTS) \
+		$(LIBNAME) $(OBJECTS) $(FOBJECTS) $(SOURCES:%c=%.d)
+
+### Dependencies ###
+
+%.d: %.c
+	@set -e; rm -f $@; \
+	$(CC) -MM $(CFLAGS) $< > $@.$$$$; \
+	sed 's,\($*\)\.o[ :]*,\1.o $@ : ,g' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
+
+ifneq ($(MAKECMDGOALS),clean)
+include $(SOURCES:%.c=%.d)
+endif
+
+# vim: set noexpandtab tabstop=4 shiftwidth=4 softtabstop=4:
+

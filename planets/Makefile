@@ -1,9 +1,16 @@
 CC = gcc
 BUILD ?= debug
-CFLAGS = -Wall -Wextra -I../Cdist
+
+NOVAS = novas.a
+NOVASPATH = ../Cdist
+NOVASLIB = $(NOVASPATH)/$(NOVAS)
+EPHUT = ephutil.a
+EPHUTPATH = ../ephutil
+EPHUTLIB = $(EPHUTPATH)/$(EPHUT)
+
+CFLAGS = -Wall -Wextra -I $(NOVASPATH) -I $(EPHUTPATH)
 LDFLAGS = -lm -lgfortran -lcurl
 
-NOVASLIB = ../Cdist/novas.a
 TARGET = planets
 SOURCES = planets.c bull_a.c
 
@@ -21,10 +28,18 @@ endif
 
 all: $(TARGET)
 
-$(TARGET): $(OBJECTS) $(NOVASLIB)
+$(TARGET): $(OBJECTS) $(NOVASLIB) $(EPHUTLIB)
+
+$(NOVASLIB):
+	make -C $(NOVASPATH) $(NOVAS)
+
+$(EPHUTLIB):
+	make -C $(EPHUTPATH) $(EPHUT)
 
 clean:
-	@rm -f $(TARGET) $(OBJECTS) $(SOURCES:%.c=%.d)
+	-rm -f $(TARGET) $(OBJECTS) $(SOURCES:%.c=%.d)
+	make -C ../Cdist clean
+	make -C ../ephutil clean
 
 ### Dependencies ###
 
