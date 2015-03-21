@@ -45,9 +45,10 @@ For your reference... and to make sure things haven't changed too much.
 
 ### Install Fortran Compiler
 
-Assumes that you have the typical GCC tools already
+Assumes that you have the typical GCC tools already. Also add the
+cURL library and development headers (for Bulletin A fetching code).
 
-`sudo yum install libgfortran gcc-gfortran`
+`sudo yum install libgfortran gcc-gfortran libcurl libcurl-devel`
 
 
 ### Set Up Development Tree
