@@ -3,7 +3,7 @@ BUILD ?= debug
 CFLAGS = -Wall -Wextra -I../Cdist
 
 LIBNAME = ephutil.a
-SOURCES = ephutil.c
+SOURCES = ephutil.c moon.c
 
 OBJECTS = $(SOURCES:%.c=%.o)
 

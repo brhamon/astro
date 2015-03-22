@@ -152,7 +152,7 @@ char *as_dms(char* buf, double val) {
     val -= tmp;
     min = (int)tmp;
     val *= 60.0;
-    tmp = floor(val + 0.5);
+    tmp = floor(val);
     sec = (int)tmp;
     snprintf(buf, DMS_MAX, "%4dd%02d'%02d\"", deg, min, sec);
     return buf;
@@ -173,7 +173,7 @@ char *as_hms(char* buf, double val) {
         val -= tmp;
         min = (int)tmp;
         val *= 60.0;
-        tmp = floor(val + 0.5);
+        tmp = floor(val);
         sec = (int)tmp;
         snprintf(buf, DMS_MAX, "%2dh%02dm%02ds", hour, min, sec);
     }

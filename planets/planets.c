@@ -1,11 +1,11 @@
 /*
  *  planets.c: Display zd/az of planets from ephemeris data
- * 
+ *
  *  Derived from software developed by:
  *
  *  U. S. Naval Observatory
  *  Astronomical Applications Dept.
- *  Washington, DC 
+ *  Washington, DC
  *  http://www.usno.navy.mil/USNO/astronomical-applications
  */
 
@@ -16,6 +16,7 @@
 #endif
 #include <novas.h>
 #include <ephutil.h>
+#include <moon.h>
 #include "bull_a.h"
 
 /*
@@ -45,7 +46,7 @@ static cat_entry polaris_cat = {"POLARIS", "HIP",   0,  2.530301028,  89.2641094
 short int display_rotation(time_parameters_t* tp, on_surface* lp, short int accuracy) {
     short int error;
     double last, gast, theta;
-    if ((error = sidereal_time(tp->jd_ut1, 0.0, tp->delta_t, 1, 1, accuracy, &gast)) 
+    if ((error = sidereal_time(tp->jd_ut1, 0.0, tp->delta_t, 1, 1, accuracy, &gast))
             != 0) {
         printf("Error %d from sidereal_time.", error);
         return error;
@@ -69,9 +70,9 @@ short int display_rotation(time_parameters_t* tp, on_surface* lp, short int accu
  * Calculate the 'Transit coordinates' for a solar system object.
  * This is the location on Earth at which the object is at local zenith.
  */
-short int transit_coord(time_parameters_t* tp, object* obj, 
+short int transit_coord(time_parameters_t* tp, object* obj,
         double x_pole, double y_pole,
-        short int accuracy, 
+        short int accuracy,
         double* lat, double* lon)
 {
     short int error = 0;
@@ -81,7 +82,7 @@ short int transit_coord(time_parameters_t* tp, object* obj,
     double pos[3];
 
     make_observer(0, NULL, NULL, &geo_ctr);
-    if ((error = place(tp->jd_tt, obj, &geo_ctr, tp->delta_t, 
+    if ((error = place(tp->jd_tt, obj, &geo_ctr, tp->delta_t,
                     coord_equ, accuracy, &t_place)) != 0) {
         printf("Error %d from place.", error);
     } else {
@@ -123,7 +124,7 @@ int main(void) {
     const double pressure = 1026.4;
 
     time_parameters_t timep;
-    double zd, az, rar, decr, tmp; 
+    double zd, az, rar, decr, tmp;
     on_surface geo_loc;
     observer obs_loc;
     cat_entry dummy_star;
@@ -131,6 +132,8 @@ int main(void) {
     object polaris;
     sky_pos t_place;
     int index, earth_index=-1;
+    double phlat, phlon;
+    int phindex;
 
     char dec_str[DMS_MAX];
     char zd_str[DMS_MAX];
@@ -190,15 +193,15 @@ int main(void) {
 #endif
 
     printf("Observer geodetic location (ITRS = WGS-84):\n"
-            "{ %s, %s, %6.1f } or { %15.10f %15.10f }\n\n", 
-           as_dms(zd_str, geo_loc.latitude), as_dms(az_str, geo_loc.longitude), 
+            "{ %s, %s, %6.1f } or { %15.10f %15.10f }\n\n",
+           as_dms(zd_str, geo_loc.latitude), as_dms(az_str, geo_loc.longitude),
            geo_loc.height, geo_loc.latitude, geo_loc.longitude);
 
     tmp = get_jd_utc();
     bull_a_entry_t* ba_ent = bull_a_find(tmp - 2400000.5);
     if (ba_ent != NULL) {
-        printf("Bulletin A: %d/%02d/%d %8.2f q=%c (%9.6f, %9.6f) %10.7f\n\n", 
-                ba_ent->month, ba_ent->day, ba_ent->year, ba_ent->mjd, 
+        printf("Bulletin A: %d/%02d/%d %8.2f q=%c (%9.6f, %9.6f) %10.7f\n\n",
+                ba_ent->month, ba_ent->day, ba_ent->year, ba_ent->mjd,
                 ba_ent->pm_quality, ba_ent->pm_x, ba_ent->pm_y, ba_ent->ut1_utc);
         x_pole = ba_ent->pm_x;
         y_pole = ba_ent->pm_y;
@@ -207,13 +210,13 @@ int main(void) {
     make_time_parameters(&timep, tmp, ut1_utc);
     display_rotation(&timep, &geo_loc, accuracy);
 
-    printf("%8s %15s %15s %15s %15s %15s\n", "Object", "RA", "DEC", "DIST", "ZA", 
+    printf("%8s %15s %15s %15s %15s %15s\n", "Object", "RA", "DEC", "DIST", "ZA",
             "AZ");
     for (index=0; index < NBR_OF_PLANETS; ++index) {
         if (index == earth_index) {
             continue; // skip Earth
         }
-        if ((error = place(timep.jd_tt, &obj[index], &obs_loc, timep.delta_t, coord_equ, 
+        if ((error = place(timep.jd_tt, &obj[index], &obs_loc, timep.delta_t, coord_equ,
                         accuracy, &t_place)) != 0) {
             printf("Error %d from place.", error);
             return error;
@@ -222,7 +225,7 @@ int main(void) {
         /*
          * Position of the planet in local horizon coordinates. Correct for refraction.
          */
-        equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc, 
+        equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
                 t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
         az -= 180.0;
         if (az < 0.0) {
@@ -231,13 +234,13 @@ int main(void) {
         /* ZA (zenith altitude) is degrees above horizon.
          * ZD (zenith distance) is degrees below zenith. */
         zd = 90.0 - zd; // convert ZD to ZA
-        printf("%8s %15s %15s %15.12f %15s %15s\n", 
-               obj[index].name, as_hms(ra_str, t_place.ra), 
-               as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd), 
+        printf("%8s %15s %15s %15.12f %15s %15s\n",
+               obj[index].name, as_hms(ra_str, t_place.ra),
+               as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd),
                as_dms(az_str, az));
     }
 
-    if ((error = place(timep.jd_tt, &polaris, &obs_loc, timep.delta_t, coord_equ, 
+    if ((error = place(timep.jd_tt, &polaris, &obs_loc, timep.delta_t, coord_equ,
                     accuracy, &t_place)) != 0) {
         printf("Error %d from place.", error);
         return error;
@@ -249,7 +252,7 @@ int main(void) {
             as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd),
             as_dms(az_str, az));
 
-    if ((error = transit_coord(&timep, &obj[9], x_pole, y_pole, accuracy, &decr, &rar)) 
+    if ((error = transit_coord(&timep, &obj[9], x_pole, y_pole, accuracy, &decr, &rar))
             != 0) {
         printf("Error %d in transit_coord.", error);
         return error;
@@ -258,6 +261,10 @@ int main(void) {
     tmp = rar - geo_loc.longitude;
     printf("Transits observer: %15.10f degrees (%s)\n", tmp,
             as_hms(ra_str, normalize(tmp / 15.0, 24.0)));
+
+    moon_phase(&timep, &obj[9], &obj[10], accuracy, &phlat, &phlon, &phindex);
+    printf("Moon phase: {%15.10f %15.10f} %s\n", phlat, phlon,
+            phindex < 0 || phindex > 7 ? "???" : moon_phase_names[phindex]);
 
 #if !defined(USING_SOLSYSV2)
     ephem_close();  /* remove this line for use with solsys version 2 */
