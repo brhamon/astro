@@ -12,7 +12,8 @@ const char *moon_phase_names[NBR_OF_MOON_PHASES] = {
 };
 
 /*
- * Calculate the position vector from Moon to Sun.
+ * Calculate the equatorial spherical coordinates of the solar transit point with
+ * respect to the center of the Earth-facing surface of the Moon.
  */
 short int moon_phase(time_parameters_t* tp,
         object* sun, object* moon, short int accuracy,

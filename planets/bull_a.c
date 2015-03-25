@@ -181,7 +181,7 @@ int bull_a_init()
                 if (fd >= 0) {
                     offset = 0;
                     while (status == 0 && offset < file_size) {
-                        nbr_bytes = write(fd, file_buffer + offset, 
+                        nbr_bytes = write(fd, file_buffer + offset,
                                 file_size - offset);
                         if (nbr_bytes < 0) {
                             status = -1;
@@ -238,7 +238,7 @@ int bull_a_init()
                     entry->ut1_utc_quality = p[57];
                     entry->ut1_utc = get_double(p+58, 10);
                     entry->ut1_utc_err = get_double(p+68, 10);
-                    /* to get true calendar year, add 1900 for MJD<=51543 
+                    /* to get true calendar year, add 1900 for MJD<=51543
                      * or add 2000 for MJD>=51544
                      */
                     if (entry->mjd >= 51544.0) {
@@ -261,7 +261,7 @@ bull_a_entry_t* bull_a_find(double mjd)
     bull_a_entry_t* entry;
     bull_a_entry_t* entry_end = entries + nbr_of_entries;
     bull_a_entry_t* prev_entry = NULL;
-    for (entry = entries; entry != NULL && entry != entry_end && entry->mjd <= mjd; 
+    for (entry = entries; entry != NULL && entry != entry_end && entry->mjd <= mjd;
             ++entry) {
         prev_entry = entry;
     }

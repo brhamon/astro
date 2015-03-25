@@ -4,17 +4,17 @@ Basic vector astronomy using NOVAS
 
 "The Naval Observatory Vector Astronomy Software (NOVAS) is a source-code
 library in Fortran, C and Python that provides common astrometric quantities
-and transformations. It can supply, in one or two function calls, the 
-instantaneous celestial position of any star or planet in a variety of 
+and transformations. It can supply, in one or two function calls, the
+instantaneous celestial position of any star or planet in a variety of
 coordinate systems."
 _NOVAS C 3.1 Guide_
 
-This project uses the NOVAS C-library to calculate the sky positions of 
+This project uses the NOVAS C-library to calculate the sky positions of
 the planets, Sun and Moon, from an observer at a fixed location on Earth.
 
 It leverages the general purpose planet ephemeris file DE430, published
 15-Aug-2013 by the National Aeronautics and Space Administration (NASA)
-Jet Propulsion Laboratory (JPL). Following the instructions below, you 
+Jet Propulsion Laboratory (JPL). Following the instructions below, you
 will download the text files that make up DE430, along with Fortran
 code that parses these and produces a binary ephemeris file for your
 architecture. Once the binary DE430 is built and tested, you will use
@@ -30,7 +30,7 @@ free to download from the publishers. Neither is provided here.
 
 ### Instructions for creating binary JPL Ephemeris DE430
 
-These instructions were tested on FC19 and FC20 x86_64 Linux. 
+These instructions were tested on FC19 and FC20 x86_64 Linux.
 
 ### NOVAS References
 
@@ -100,7 +100,7 @@ In `jplsubs.f`, in `SUBROUTINE FSIZER3`, change the line:
 ```
        NRECL=
 ```
-       
+
 To:
 
 ```
@@ -222,7 +222,7 @@ Look for two locations where `cdim` is initialized to 400. Look for lines matchi
 ```
       PARAMETER (cdim = 400)
 ```
-      
+
 Change the `400` to `600`
 
 Build `checkout-stars`
@@ -343,6 +343,19 @@ from an older ephemeris. Here's my output:
 # Congratulations!
 
 You have built and tested NOVAS with JPL DE430.
+
+# Planets
+
+Once a binary ephemeris is available, you can build and run `planets`.
+The code for fetching Bulletin A from the USNO requires the `libcurl-devel`
+package. A symbolic link to `JPLEPH` will also be required.
+
+```
+cd ../planets
+make
+ln -s ../ephemeris/fortran/JPLEPH
+watch ./planets
+```
 
 ## Further Reading
 

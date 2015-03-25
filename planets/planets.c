@@ -177,11 +177,12 @@ int main(void) {
      */
 
     if ((error = ephem_open("JPLEPH", &jd_beg, &jd_end, &de_num)) != 0) {
-    if (error == 1) {
-        printf("JPL ephemeris file not found.\n");
-    } else {
-        printf("Error reading JPL ephemeris file header.\n");
-        return error;
+        if (error == 1) {
+            printf("JPL ephemeris file not found.\n");
+        } else {
+            printf("Error reading JPL ephemeris file header.\n");
+            return error;
+        }
     } else {
         printf("JPL ephemeris DE%d open. Start JD = %10.2f  End JD = %10.2f\n\n",
             de_num, jd_beg, jd_end);
@@ -262,9 +263,17 @@ int main(void) {
     printf("Transits observer: %15.10f degrees (%s)\n", tmp,
             as_hms(ra_str, normalize(tmp / 15.0, 24.0)));
 
-    moon_phase(&timep, &obj[9], &obj[10], accuracy, &phlat, &phlon, &phindex);
-    printf("Moon phase: {%15.10f %15.10f} %s\n", phlat, phlon,
-            phindex < 0 || phindex > 7 ? "???" : moon_phase_names[phindex]);
+    error = moon_phase(&timep, &obj[9], &obj[10], accuracy, &phlat, &phlon, &phindex);
+    if (error != 0) {
+        printf("Error %d from moon_phase.", error);
+        return error;
+    }
+    if (phindex < 0 || phindex > 7) {
+        printf("WARNING: Moon phase index (%d) is out of bounds.\n", phindex);
+        phindex = 0;
+    }
+    printf("Moon phase: {%15.10f %15.10f} %s [%+9.5f]\n", phlat, phlon,
+            moon_phase_names[phindex], (double)(phindex * 45) - normalize(phlon, 360.0));
 
 #if !defined(USING_SOLSYSV2)
     ephem_close();  /* remove this line for use with solsys version 2 */

@@ -60,7 +60,7 @@ int get_eph_title(char* out_str, int out_len, const char* eph_name);
 
 /* normalize a periodic value
  * return a double in the range [0.0, period) which represents
- * the "phase" of val. For example, normalize(theta, 2*PI) will 
+ * the "phase" of val. For example, normalize(theta, 2*PI) will
  * return the phase of theta in radians. normalize( julian_date, 7.0 )
  * will return the day-of-the-week for the given julian_date.
  */
