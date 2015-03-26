@@ -41,8 +41,8 @@ typedef struct time_parameters_t_ {
     double delta_t;
 } time_parameters_t;
 
-#define DMS_MAX 12
-#define HMS_MAX 10
+#define DMS_MAX 14
+#define HMS_MAX 13
 
 double get_jd_utc();
 void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc);

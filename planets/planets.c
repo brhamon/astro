@@ -20,23 +20,21 @@
 #include "bull_a.h"
 
 /*
- * Put one star here for sanity checking. Polaris will always be within about 1
- * degree of the Celestial Intermediate Pole (CIP).
+ * Information for Polaris (HD8890) is taken from the SKY2000 Master Catalog, Version 5.
+ * The catalog was downloaded from the SIMBAD Astronomical Database. (file size: 30.4M)
  *
- * starname[SIZE_OF_OBJ_NAME] = name of celestial object
- * catalog[SIZE_OF_CAT_NAME]  = catalog designator (e.g., HIP)
- * starnumber                 = integer identifier assigned to object
- * ra                         = ICRS right ascension (hours)
- * dec                        = ICRS declination (degrees)
- * promora                    = ICRS proper motion in right ascension
- *                              (milliarcseconds/year)
- * promodec                   = ICRS proper motion in declination
- *                              (milliarcseconds/year)
- * parallax                   = parallax (milliarcseconds)
- * radialvelocity             = radial velocity (km/s)
+ * Direct link:
+ * http://cdsarc.u-strasbg.fr/viz-bin/nph-Cat/tar.gz?V%2F145
+ *
+ * Mirror in the United States:
+ * http://vizier.cfa.harvard.edu/viz-bin/nph-Cat/tar.gz?V%2F145
+ *
+ * Because this catalog provides J2000 position data, it was converted to
+ * ICRS using the NOVAS transform_cat function, option 4. The name "SKI" is used to
+ * identify entries from this catalog, which stands for "SKY2000r5v4 (ICRS)".
  */
-static cat_entry polaris_cat = {"POLARIS", "HIP",   0,  2.530301028,  89.264109444,
-               44.22, -11.75,  7.56, -17.4};
+static cat_entry polaris_cat = {"POLARIS", "SKI", 2480053, 2.53030774, 89.264114249,
+               3442.94998, -11.8063,  7.56, -17.4};
 
 /*
  * Display Greenwich and local apparent sidereal time and Earth Rotation Angle.
@@ -211,7 +209,7 @@ int main(void) {
     make_time_parameters(&timep, tmp, ut1_utc);
     display_rotation(&timep, &geo_loc, accuracy);
 
-    printf("%8s %15s %15s %15s %15s %15s\n", "Object", "RA", "DEC", "DIST", "ZA",
+    printf("%8s %12s %13s %18s %13s %13s\n", "Object", "RA", "DEC", "DIST", "ZA",
             "AZ");
     for (index=0; index < NBR_OF_PLANETS; ++index) {
         if (index == earth_index) {
@@ -235,12 +233,15 @@ int main(void) {
         /* ZA (zenith altitude) is degrees above horizon.
          * ZD (zenith distance) is degrees below zenith. */
         zd = 90.0 - zd; // convert ZD to ZA
-        printf("%8s %15s %15s %15.12f %15s %15s\n",
+        printf("%8s %s %s %18.12e %s %s\n",
                obj[index].name, as_hms(ra_str, t_place.ra),
                as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd),
                as_dms(az_str, az));
     }
 
+    /* Polaris provides a helpful frame of reference for the other numbers, since
+     * it's always very close to the CIP.
+     */
     if ((error = place(timep.jd_tt, &polaris, &obs_loc, timep.delta_t, coord_equ,
                     accuracy, &t_place)) != 0) {
         printf("Error %d from place.", error);
@@ -248,11 +249,20 @@ int main(void) {
     }
     equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
             t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
-    printf("%8s %15s %15s %15.12f %15s %15s\n",
+
+    /* equ2hor leaves the distance at 0.0. Provide an estimate in AU. */
+    double paralx = polaris_cat.parallax;
+    if (paralx <= 0.0) {
+        paralx = 1.0e-6;
+    }
+    t_place.dis = 1.0 / sin (paralx * 1.0e-3 * ASEC2RAD);
+
+    printf("%8s %s %s %18.12e %s %s\n",
             polaris_cat.starname, as_hms(ra_str, t_place.ra),
             as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd),
             as_dms(az_str, az));
 
+    /* Calculate Solar transit info. */
     if ((error = transit_coord(&timep, &obj[9], x_pole, y_pole, accuracy, &decr, &rar))
             != 0) {
         printf("Error %d in transit_coord.", error);
@@ -263,6 +273,7 @@ int main(void) {
     printf("Transits observer: %15.10f degrees (%s)\n", tmp,
             as_hms(ra_str, normalize(tmp / 15.0, 24.0)));
 
+    /* Calculate Moon phase info. */
     error = moon_phase(&timep, &obj[9], &obj[10], accuracy, &phlat, &phlon, &phindex);
     if (error != 0) {
         printf("Error %d from moon_phase.", error);

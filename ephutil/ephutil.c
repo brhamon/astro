@@ -136,7 +136,7 @@ void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc) 
 }
 
 char *as_dms(char* buf, double val) {
-    int deg, min, sec;
+    int deg, min;
     double tmp;
     int sign = 1;
 
@@ -152,14 +152,12 @@ char *as_dms(char* buf, double val) {
     val -= tmp;
     min = (int)tmp;
     val *= 60.0;
-    tmp = floor(val);
-    sec = (int)tmp;
-    snprintf(buf, DMS_MAX, "%4dd%02d'%02d\"", deg, min, sec);
+    snprintf(buf, DMS_MAX, "%4dd%02d'%04.1f\"", deg, min, val);
     return buf;
 }
 
 char *as_hms(char* buf, double val) {
-    int hour, min, sec;
+    int hour, min;
     double tmp;
 
     if (val < 0.0 || val >= 24.0) {
@@ -173,9 +171,7 @@ char *as_hms(char* buf, double val) {
         val -= tmp;
         min = (int)tmp;
         val *= 60.0;
-        tmp = floor(val);
-        sec = (int)tmp;
-        snprintf(buf, DMS_MAX, "%2dh%02dm%02ds", hour, min, sec);
+        snprintf(buf, DMS_MAX, "%2dh%02dm%05.2fs", hour, min, val);
     }
     return buf;
 }
