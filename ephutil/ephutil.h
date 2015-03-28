@@ -49,8 +49,16 @@ void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc);
 char *as_dms(char* buf, double val);
 char *as_hms(char* buf, double val);
 
+void get_rtrim(char* out, size_t max_out, const char* in_beg, const char* in_end);
+int get_int(const char* cp, size_t len);
+double get_double(const char* cp, size_t len);
+
 #define NBR_OF_PLANETS 11
 const planet_t the_planets[NBR_OF_PLANETS];
+
+void init_eph_const();
+void free_eph_const();
+double get_eph_const(const char* nam);
 
 /*
  * Read the title string that appears at the beginning of every JPL binary ephemeris

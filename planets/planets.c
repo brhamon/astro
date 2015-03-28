@@ -29,12 +29,9 @@
  * Mirror in the United States:
  * http://vizier.cfa.harvard.edu/viz-bin/nph-Cat/tar.gz?V%2F145
  *
- * Because this catalog provides J2000 position data, it was converted to
- * ICRS using the NOVAS transform_cat function, option 4. The name "SKI" is used to
- * identify entries from this catalog, which stands for "SKY2000r5v4 (ICRS)".
  */
-static cat_entry polaris_cat = {"POLARIS", "SKI", 2480053, 2.53030774, 89.264114249,
-               3442.94998, -11.8063,  7.56, -17.4};
+static cat_entry polaris_cat = {"POLARIS", "SKI", 2480053, 2.5303010278, 89.2641094444,
+               3442.95000, -11.8,  7.56, -17.4};
 
 /*
  * Display Greenwich and local apparent sidereal time and Earth Rotation Angle.

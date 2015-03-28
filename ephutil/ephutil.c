@@ -135,44 +135,83 @@ void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc) 
     tp->jd_ut1, tp->delta_t, tp->leapsecs);
 }
 
-char *as_dms(char* buf, double val) {
-    int deg, min;
-    double tmp;
-    int sign = 1;
+extern void const_(char* nam, double* val, double* sss, int* n);
 
-    if (val < 0.0) {
-        sign = -1;
-        val = -val;
-    }
-    tmp = floor(val);
-    val -= tmp;
-    deg = (int)tmp * sign;
-    val *= 60.0;
-    tmp = floor(val);
-    val -= tmp;
-    min = (int)tmp;
-    val *= 60.0;
-    snprintf(buf, DMS_MAX, "%4dd%02d'%04.1f\"", deg, min, val);
-    return buf;
+typedef struct eph_const_t_ {
+    char nam[8];
+    double val;
+} eph_const_t;
+
+static int cmp_eph_const(const void *p1, const void *p2) {
+    return strcmp(((const eph_const_t *)p1)->nam, ((const eph_const_t *)p2)->nam);
 }
 
-char *as_hms(char* buf, double val) {
-    int hour, min;
-    double tmp;
+static eph_const_t* eph_consts = NULL;
+static int nbr_of_eph_consts = 0;
+static double eph_jd[3];
 
-    if (val < 0.0 || val >= 24.0) {
-        snprintf(buf, DMS_MAX, "#ERANGE#");
+void init_eph_const() {
+    const int cdim = 600;
+    const int nam_len = 6;
+
+    free_eph_const();
+    char* my_nam = (char*)malloc(cdim * nam_len);
+    double* my_val = (double*)malloc(cdim * sizeof(double));
+    const_(my_nam, my_val, eph_jd, &nbr_of_eph_consts);
+
+    if (nbr_of_eph_consts > 0 && nbr_of_eph_consts < cdim) {
+	eph_consts = (eph_const_t*)malloc(sizeof(eph_const_t) * nbr_of_eph_consts);
+	if (eph_consts == NULL) {
+	    printf("Error allocating ephemeris constants.\n");
+	    nbr_of_eph_consts = 0;
+	    goto out;
+	}
+
+	int i;
+	char *p = my_nam;
+	eph_const_t* dest = eph_consts;
+	for (i=0; i < nbr_of_eph_consts; ++i) {
+	    memset(dest->nam, 0, sizeof(dest->nam));
+	    get_rtrim(dest->nam, sizeof(dest->nam), p, p + nam_len);
+	    dest->val = my_val[i];
+	    ++dest;
+	    p += nam_len;
+	}
+	qsort(eph_consts, nbr_of_eph_consts, sizeof(eph_const_t), cmp_eph_const);
     } else {
-        tmp = floor(val);
-        val -= tmp;
-        hour = (int)tmp;
-        val *= 60.0;
-        tmp = floor(val);
-        val -= tmp;
-        min = (int)tmp;
-        val *= 60.0;
-        snprintf(buf, DMS_MAX, "%2dh%02dm%05.2fs", hour, min, val);
+	nbr_of_eph_consts = 0;
     }
-    return buf;
+
+out:
+    free(my_val);
+    free(my_nam);
 }
 
+void free_eph_const() {
+    if (eph_consts != NULL) {
+	free(eph_consts);
+	eph_consts = NULL;
+    }
+    nbr_of_eph_consts = 0;
+}
+
+#if !defined(NAN)
+#error NAN is not defined
+#endif
+
+double get_eph_const(const char* nam) {
+    eph_const_t key, *res;
+    if (eph_consts == NULL || nbr_of_eph_consts == 0) {
+	return NAN;
+    }
+    int nam_len = strlen(nam);
+    if (0 < nam_len && nam_len <= 6) {
+	strcpy(key.nam, nam);
+	res = bsearch(&key, eph_consts, nbr_of_eph_consts, sizeof(eph_const_t), 
+		cmp_eph_const);
+	if (res != NULL) {
+	    return res->val;
+	}
+    }
+    return NAN;
+}
