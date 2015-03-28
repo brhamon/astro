@@ -1,0 +1,33 @@
+FC = gcc
+BUILD ?= debug
+LDFLAGS = -lm -lgfortran
+
+TARGETS = asc2eph testeph
+SOURCES = asc2eph.f testeph.f jplsubs.f
+
+ifeq ($(BUILD),debug)
+FFLAGS += -g
+else
+ifeq ($(BUILD),release)
+FFLAGS += -O3 -DNDEBUG
+endif
+endif
+
+.PHONY: all clean
+
+all: $(TARGETS)
+
+asc2eph: asc2eph.o
+
+testeph: testeph.o jplsubs.o
+
+test: testeph JPLEPH
+	cat ../ascii/de430/testpo.430 | ./testeph
+
+JPLEPH: asc2eph
+	cat ../ascii/de430/header.430_572 ../ascii/de430/asc*.430 | ./asc2eph
+
+clean:
+	@rm -f $(TARGETS) *.o
+
+# vim: set noexpandtab tabstop=4 shiftwidth=4 softtabstop=4:

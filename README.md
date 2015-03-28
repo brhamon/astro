@@ -53,144 +53,19 @@ cURL library and development headers (for Bulletin A fetching code).
 
 ### Set Up Development Tree
 
-Starting from this directory...
+The Bash script `setup-linux64.sh` will download and prepare the
+NOVAS-C sources from the U. S. Naval Observatory and the DE430
+ephemeris from the NASA JPL.
 
-```
-mkdir -p ephemeris/ascii/de430
-mkdir -p ephemeris/fortran
-curl -O http://aa.usno.navy.mil/software/novas/novas_c/novasc3.1.tar.gz
-tar -xzf novasc3.1.tar.gz
-cd ephemeris/fortran
-for p in $(curl --list-only ftp://ssd.jpl.nasa.gov/pub/eph/planets/fortran/); do \
-	curl -O ftp://ssd.jpl.nasa.gov/pub/eph/planets/fortran/$p; \
-    done
-cd ../ascii/de430
-for p in $(curl --list-only ftp://ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/); do \
-	curl -O ftp://ssd.jpl.nasa.gov/pub/eph/planets/ascii/de430/$p; \
-    done
-```
+The files are downloaded via FTP from these external sites. The
+sites tend to be busy, so you may have to run the setup script
+several times before it completes successfully.
 
-### Build asc2eph
+`./setup-linux64.sh`
 
-`cd ../../fortran`
+### Build asc2eph, JPLEPH and test
 
-The instructions in `userguide.txt` are authoritative. These instructions were
-derived from the instructions dated "24 March 2013".
-
-`vim testeph.f jplsubs.f`
-
-Cut six subroutines from `testeph.f`, paste into a new file named `jplsubs.f`
-
-1. FSIZER3
-2. PLEPH
-3. INTERP
-4. SPLIT
-5. STATE
-6. CONST
-
-Delete two additional subtroutines from `testeph.f`
-
-1. FSIZER1
-2. FSIZER2
-
-After these edits, `testeph.f` will only include the main code (no subroutines).
-
-In `jplsubs.f`, in `SUBROUTINE FSIZER3`, change the line:
-
-```
-       NRECL=
-```
-
-To:
-
-```
-      NRECL=4
-```
-
-NOTE: Leading whitespace in Fortran is significant, so remove *one* of
-the indention spaces so it has a 6-space indention.
-
-Further down in `SUBROUTINE FSIZER3`, change the line:
-
-```
-      KSIZE =
-```
-
-To:
-
-```
-      KSIZE=2036
-```
-
-Search for `CALL FSIZER3` and uncomment the line (by deleting the 'C' in column 1).
-
-Save and quit vim. Edit `asc2eph.f`
-
-`vim asc2eph.f`
-
-Find the line:
-
-```
-C      PARAMETER ( NRECL = 4 )
-```
-
-Uncomment it (delete the 'C' in col 1)
-
-Create a `Makefile`. Here's mine:
-
-```
-FC = gcc
-BUILD ?= debug
-LDFLAGS = -lm -lgfortran
-
-TARGETS = asc2eph testeph
-SOURCES = asc2eph.f testeph.f jplsubs.f
-
-ifeq ($(BUILD),debug)
-FFLAGS += -g
-else
-ifeq ($(BUILD),release)
-FFLAGS += -O3 -DNDEBUG
-endif
-endif
-
-.PHONY: all clean
-
-all: $(TARGETS)
-
-asc2eph: asc2eph.o
-
-testeph: testeph.o jplsubs.o
-
-clean:
-	@rm -f $(TARGETS) *.o
-
-# vim: set noexpandtab tabstop=4 shiftwidth=4 softtabstop=4:
-```
-
-Set the environment to build in debug mode (optional)
-
-`export BUILD=debug`
-
-Build
-
-`make`
-
-### Generate JPLEPH
-
-Generate the binary ephemeris
-
-`cat ../ascii/de430/header.430_572 ../ascii/de430/asc*.430 | ./asc2eph`
-
-Confirm the file is created
-
-`ls -al JPLEPH`
-
-(It will be about 100M in length)
-
-Test it!
-
-`cat ../ascii/de430/testpo.430 | ./testeph`
+`make -C ephemeris/fortran test`
 
 The output will display (among other things) the _jpl values_, _user value_ and _difference_.
 
@@ -200,34 +75,14 @@ A successful run will have no difference greater than about `0.71054E-14`
 
 You now have the binary ephemeris for your platform.
 
-### Build NOVAS example.c
-
-We are still in the `ephemeris/fortran/` directory...
-
-```
-cp jplsubs.f ../../Cdist
-cd ../../Cdist
-```
-
-Create a symlink to JPLEPH
-
-`ln -s ../ephemeris/fortran/JPLEPH`
-
-Fix `jplint.f` (to allow 572-parameters in the ephemeris)
-
-`vim jplint.f`
-
-Look for two locations where `cdim` is initialized to 400. Look for lines matching:
-
-```
-      PARAMETER (cdim = 400)
-```
-
-Change the `400` to `600`
+### Build NOVAS examples
 
 Build `checkout-stars`
 
-`make checkout-stars`
+```
+cd Cdist
+make checkout-stars
+```
 
 Run `checkout-stars`
 
@@ -265,41 +120,7 @@ differences in the numeric output. Here's what my diff output looks like:
 
 ### Build example
 
-In `example.c`, there's a few places where you need to adjust the
-source code to use solsys version 2. These are documented in the code,
-but I'm also providing a quick list here.
-
-Search for, and delete the following line:
-
-```
-#include "eph_manager.h" /* remove this line for use with solsys version 2 */
-```
-
-Delete the block of code following the comment:
-
-```
-/*
-   Open the JPL binary ephemeris file, here named "JPLEPH".
-   Remove this block for use with solsys version 2.
-*/
-```
-
-Uncomment the block of code following the comment:
-
-```
-/*
-  Uncomment block below for use with solsys version 2
-  Prints alternate header
-*/
-```
-
-Delete the following line:
-
-```
-   ephem_close();  /* remove this line for use with solsys version 2 */
-```
-
-Save and quit. Then build:
+The current directory is `Cdist`.
 
 `make example`
 
@@ -353,7 +174,6 @@ package. A symbolic link to `JPLEPH` will also be required.
 ```
 cd ../planets
 make
-ln -s ../ephemeris/fortran/JPLEPH
 watch ./planets
 ```
 
