@@ -1,0 +1,76 @@
+diff -rbU3 Cdist.orig/example.c Cdist/example.c
+--- Cdist.orig/example.c	2011-01-21 14:48:11.000000000 +0000
++++ Cdist/example.c	2015-03-28 18:29:47.000000000 +0000
+@@ -13,7 +13,6 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <math.h>
+-#include "eph_manager.h" /* remove this line for use with solsys version 2 */
+ #include "novas.h"
+ 
+ 
+@@ -105,33 +104,13 @@
+    }
+    
+ /*
+-   Open the JPL binary ephemeris file, here named "JPLEPH".
+-   Remove this block for use with solsys version 2.
+-*/
+-
+-   if ((error = ephem_open ("JPLEPH", &jd_beg,&jd_end,&de_num)) != 0)
+-   {
+-      if (error == 1)
+-         printf ("JPL ephemeris file not found.\n");
+-       else
+-         printf ("Error reading JPL ephemeris file header.\n");
+-      return (error);
+-   }
+-    else
+-   {
+-      printf ("JPL ephemeris DE%d open. Start JD = %10.2f  End JD = %10.2f\n",
+-         de_num, jd_beg, jd_end);
+-      printf ("\n");
+-   }
+-
+-/*
+   Uncomment block below for use with solsys version 2
+   Prints alternate header
+ */
+-/*
++
+    printf ("Using solsys version 2, no description of JPL ephemeris available\n");
+    printf ("\n");
+-*/
++
+ 
+ /*
+    Write banner.
+@@ -332,7 +311,5 @@
+    printf ("\n");
+    
+ 
+-   ephem_close();  /* remove this line for use with solsys version 2 */
+-      
+    return (0);
+ }
+diff -rbU3 Cdist.orig/jplint.f Cdist/jplint.f
+--- Cdist.orig/jplint.f	2011-01-21 14:48:10.000000000 +0000
++++ Cdist/jplint.f	2015-03-13 22:22:59.000000000 +0000
+@@ -72,7 +72,7 @@
+ C     ('nvals') is known.
+ 
+       INTEGER cdim
+-      PARAMETER (cdim = 400)
++      PARAMETER (cdim = 600)
+ 
+       CHARACTER name(cdim)*6
+ 
+@@ -166,7 +166,7 @@
+ C     ('nvals') is known.
+ 
+       INTEGER cdim
+-      PARAMETER (cdim = 400)
++      PARAMETER (cdim = 600)
+ 
+       CHARACTER name(cdim)*6
+ 
