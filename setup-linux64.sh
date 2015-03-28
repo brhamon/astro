@@ -55,6 +55,7 @@ if [[ ! -f .Cdist.is_patched ]]; then
 	patch -p1 < ../support/novasc3.1-linux64.patch
 	cp ../support/Makefile.Cdist Makefile
 	ln -s ../ephemeris/fortran/JPLEPH
+	ln -s ../ephemeris/fortran/jplsubs.f
 	popd
 	touch .Cdist.is_patched
 fi

@@ -167,9 +167,17 @@ You have built and tested NOVAS with JPL DE430.
 
 # Planets
 
-Once a binary ephemeris is available, you can build and run `planets`.
-The code for fetching Bulletin A from the USNO requires the `libcurl-devel`
-package. A symbolic link to `JPLEPH` will also be required.
+The `planets` program uses the ephemeris and NOVAS-C library to
+display the positions of the planets from an observer on Earth.
+
+You will want to edit `planets.c` to use your geodetic location.
+Search for `REPLACE WITH YOUR LOCATION`
+Update the latitude, longitude, height, temperature and pressure
+with values appropriate for your location. Latitude is expressed in
+degrees north of the Equator. Longitude is expressed in degrees east
+of the Prime Meridian. Height is expressed in meters above sea level.
+Temperature is expressed in degrees Celsius. Pressure is expressed
+in millibars.
 
 ```
 cd ../planets
