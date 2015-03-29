@@ -96,14 +96,25 @@ short int transit_coord(time_parameters_t* tp, object* obj,
     return error;
 }
 
+/*
+ * Kerry Shetline's excellent SkyViewCafe presents ZD as "Altitude",
+ * and Azimuth is presented as "degrees West of South".
+ *
+ * This function adjusts the equ2hor ZD/AZ values to match SkyViewCafe.
+ */
+void correct_zd_az(double* zd, double* az) {
+    *az = normalize(*az - 180.0, 360.0);
+    *zd = 90.0 - *zd;
+}
+
 int main(void) {
 /*
  * The following three values are Earth Orientation (EO) paramters published by IERS.
  * See bull_a.c for more information.
  */
-    double x_pole = 0.005165;
-    double y_pole = 0.366089;
-    double ut1_utc = -0.5340900;
+    double x_pole = 0.0;
+    double y_pole = 0.0;
+    double ut1_utc = 0.0;
 
     const short int accuracy = 0;
     short int error = 0;
@@ -223,13 +234,7 @@ int main(void) {
          */
         equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
                 t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
-        az -= 180.0;
-        if (az < 0.0) {
-            az += 360.0;
-        }
-        /* ZA (zenith altitude) is degrees above horizon.
-         * ZD (zenith distance) is degrees below zenith. */
-        zd = 90.0 - zd; // convert ZD to ZA
+        correct_zd_az(&zd, &az);
         printf("%8s %s %s %18.12e %s %s\n",
                obj[index].name, as_hms(ra_str, t_place.ra),
                as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd),
@@ -246,6 +251,7 @@ int main(void) {
     }
     equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
             t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
+    correct_zd_az(&zd, &az);
 
     /* equ2hor leaves the distance at 0.0. Provide an estimate in AU. */
     double paralx = polaris_cat.parallax;
