@@ -215,6 +215,8 @@ int main(void) {
         ut1_utc = ba_ent->ut1_utc;
     }
     make_time_parameters(&timep, tmp, ut1_utc);
+    printf ("TT=%15.6f UT1=%15.6f delta-T=%16.11f leapsecs=%5.1f\n\n", timep.jd_tt,
+        timep.jd_ut1, timep.delta_t, timep.leapsecs);
     display_rotation(&timep, &geo_loc, accuracy);
 
     printf("%8s %12s %13s %18s %13s %13s\n", "Object", "RA", "DEC", "DIST", "ZA",

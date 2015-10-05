@@ -130,9 +130,6 @@ void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc) 
     tp->jd_tt = tp->jd_utc + (tp->leapsecs + 32.184) / 86400.0;
     tp->jd_ut1 = tp->jd_utc + ut1_utc / 86400.0;
     tp->delta_t = 32.184 + tp->leapsecs - ut1_utc;
-
-    printf ("TT=%15.6f UT1=%15.6f delta-T=%16.11f leapsecs=%5.1f\n\n", tp->jd_tt,
-    tp->jd_ut1, tp->delta_t, tp->leapsecs);
 }
 
 extern void const_(char* nam, double* val, double* sss, int* n);

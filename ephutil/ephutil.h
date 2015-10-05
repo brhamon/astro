@@ -16,6 +16,20 @@ enum {
     coord_astro
 };
 
+enum {
+    pln_mercury=1,
+    pln_venus,
+    pln_earth,
+    pln_mars,
+    pln_jupiter,
+    pln_saturn,
+    pln_uranus,
+    pln_neptune,
+    pln_pluto,
+    pln_sun,
+    pln_moon
+};
+
 typedef struct planet_t_ {
     int id;
     const char* name;
