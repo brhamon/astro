@@ -11,8 +11,8 @@ EPHUTLIB = $(EPHUTPATH)/$(EPHUT)
 CFLAGS = -Wall -Wextra -I $(NOVASPATH) -I $(EPHUTPATH)
 LDFLAGS = -lm -lgfortran -lcurl
 
-TARGET = planets
-SOURCES = planets.c
+TARGET = tropical
+SOURCES = tropical.c
 
 OBJECTS = $(SOURCES:%.c=%.o)
 

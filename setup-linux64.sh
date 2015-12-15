@@ -71,10 +71,12 @@ if [[ ! -f .ephemeris.fortran.is_patched ]]; then
 	touch .ephemeris.fortran.is_patched
 fi
 get_files .ephemeris.ascii.de430 ephemeris/ascii/de430 pub/eph/planets/ascii/de430
-if [[ ! -s planets/JPLEPH ]]; then
-	pushd planets
-	ln -s ../ephemeris/fortran/JPLEPH
-	popd
-fi
+for app_path in planets tropical; do
+	if [[ ! -s ${app_path}/JPLEPH ]]; then
+		pushd ${app_path}
+		ln -s ../ephemeris/fortran/JPLEPH
+		popd
+	fi
+done
 echo "Done"
 # vim:set ts=4 sts=4 sw=4 cindent noexpandtab:
