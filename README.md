@@ -1,7 +1,7 @@
 # astro
 
 The astro project seeks to help programmers new to vector
-astronomy obtain current, accurate ephemris data; and create
+astronomy obtain current, accurate ephemeris data; and create
 a platform-compatible data file. Once the ephemeris and
 library are built, small sample applications are included
 to verify correctness and demonstrate the library's
@@ -18,7 +18,7 @@ platforms; however, a Windows/MSVC project is planned for the future.
 
 Included in this source code repository are two sample programs
 which use NOVAS-C to calculate the apparent position of the Sun
-and planets from an obervation point on Earth, and a program to
+and planets from an observation point on Earth, and a program to
 display the next two tropical moments (equinox and solstice).
 
 The goal of this project is to encourage amatuer astronomical
@@ -46,7 +46,7 @@ The known issues are:
 * sidereal_time units bug
 * ephem_close does not reset the EPHFILE pointer
 
-This project leverages the general purpose planet ephemeris file DE430, published
+This project uses the general purpose planet ephemeris file DE430, published
 15-Aug-2013 by the National Aeronautics and Space Administration (NASA)
 Jet Propulsion Laboratory (JPL). Following the instructions below, you
 will download the text files that make up DE430, along with Fortran
