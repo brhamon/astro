@@ -6,7 +6,7 @@
  *  U. S. Naval Observatory
  *  Astronomical Applications Dept.
  *  Washington, DC
- *  http://www.usno.navy.mil/USNO/astronomical-applications
+ *  http://aa.usno.navy.mil/software/novas/novas_info.php
  */
 
 #define USING_SOLSYSV2

@@ -1,3 +1,20 @@
+/*
+ *  tropical.c: Display the next two tropical moments
+ *
+ *  A tropical moment is one of the four points in the
+ *  tropical year known as a "solstice" or an "equinox."
+ *  The solstice corresponds to the local maximum or
+ *  minimum of the latitude of the subsolar point,
+ *  and the equinox corresponds to the crossing of the
+ *  equator by the subsolar point.
+ *
+ *  Derived from software developed by:
+ *
+ *  U. S. Naval Observatory
+ *  Astronomical Applications Dept.
+ *  Washington, DC
+ *  http://aa.usno.navy.mil/software/novas/novas_info.php
+ */
 #include <novas.h>
 #include <ephutil.h>
 #include <string.h>
@@ -92,7 +109,7 @@ short int calculate_sample(moment_t* sample_ptr, double jd, object* sol_ptr,
 #define FALSE 0
 #define TRUE (!FALSE)
 
-short int calculate_next_equinox(double* equ_jd, double cur_j, object* sol_ptr,
+short int calculate_next_equinox(moment_t* equinox, double cur_j, object* sol_ptr,
         short int accuracy) {
     short int error = 0;
     int index;
@@ -198,11 +215,11 @@ short int calculate_next_equinox(double* equ_jd, double cur_j, object* sol_ptr,
             sample[ALPHA] = sample[GAMMA];
         }
     }
-    *equ_jd = sample[ALPHA].jd;
+    *equinox = sample[ALPHA];
     return error;
 }
 
-short int calculate_next_solstice(double* sol_jd, double cur_j, object* sol_ptr,
+short int calculate_next_solstice(moment_t* moment, double cur_j, object* sol_ptr,
         short int accuracy) {
     int index;
     moment_t sample[NBR_OF_SAMPLES];
@@ -267,7 +284,7 @@ short int calculate_next_solstice(double* sol_jd, double cur_j, object* sol_ptr,
             sample[ALPHA] = sample[GAMMA];
         }
     }
-    *sol_jd = sample[ALPHA].jd;
+    *moment = sample[ALPHA];
     return error;
 }
 
@@ -275,12 +292,12 @@ static const char* tropical_moment_names[] = {
     "March", "June", "September", "December"
 };
 
-void display_moment(const char* moment_str, double sol_jd) {
+void display_moment(const char* moment_str, moment_t* moment) {
     double cur_j;
     short int year, month, day;
     short int hour, minute, second;
 
-    cal_date(sol_jd, &year, &month, &day, &cur_j);
+    cal_date(moment->jd, &year, &month, &day, &cur_j);
     hour = (short int)floor(cur_j);
     cur_j -= (double)hour;
     cur_j *= 60.0;
@@ -292,12 +309,13 @@ void display_moment(const char* moment_str, double sol_jd) {
     printf("%s %s occurs at %d-%02d-%02d %02d:%02d:%02d UTC\n",
             tropical_moment_names[(month-1)/3],
             moment_str, year, month, day, hour, minute, second);
+    printf("Subsolar point: {%15.10f %15.10f}\n", moment->lat, moment->lon);
 }
 
 int main(void) {
     double cur_j;
-    double sol_jd;
-    double equ_jd;
+    moment_t solstice;
+    moment_t equinox;
     cat_entry dummy_star;
     object sol;
     short int error = 0;
@@ -321,21 +339,21 @@ int main(void) {
         return error;
     }
 
-    cur_j = get_jd_utc();
-    if ((error = calculate_next_solstice(&sol_jd, cur_j, &sol, accuracy)) != 0) {
+    cur_j = get_jd_utc() - 1;
+    if ((error = calculate_next_solstice(&solstice, cur_j, &sol, accuracy)) != 0) {
         printf("Error %d in calculate_next_solstice\n", error);
         return error;
     }
-    if ((error = calculate_next_equinox(&equ_jd, cur_j, &sol, accuracy)) != 0) {
+    if ((error = calculate_next_equinox(&equinox, cur_j, &sol, accuracy)) != 0) {
         printf("Error %d in calculate_next_equinox\n", error);
         return error;
     }
-    if (sol_jd < equ_jd) {
-        display_moment("solstice", sol_jd);
-        display_moment("equinox", equ_jd);
+    if (solstice.jd < equinox.jd) {
+        display_moment("solstice", &solstice);
+        display_moment("equinox", &equinox);
     } else {
-        display_moment("equinox", equ_jd);
-        display_moment("solstice", sol_jd);
+        display_moment("equinox", &equinox);
+        display_moment("solstice", &solstice);
     }
 
     bull_a_cleanup();

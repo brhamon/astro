@@ -1,6 +1,31 @@
 # astro
 
-Basic vector astronomy using NOVAS
+The astro project seeks to help programmers new to vector
+astronomy obtain current, accurate ephemris data; and create
+a platform-compatible data file. Once the ephemeris and
+library are built, small sample applications are included
+to verify correctness and demonstrate the library's
+capabilities.
+
+This project leverages the latest JPL Ephemeris (DE430) and
+NOVAS-C release (3.1).  The NOVAS C distribution and JPL Ephemeris
+and utility software are free to download from the publishers.
+Neither is provided here.
+
+Instead, this project will simplify the process and provide
+sample executables. The operation is scripted for generic Linux
+platforms; however, a Windows/MSVC project is planned for the future.
+
+Included in this source code repository are two sample programs
+which use NOVAS-C to calculate the apparent position of the Sun
+and planets from an obervation point on Earth, and a program to
+display the next two tropical moments (equinox and solstice).
+
+The goal of this project is to encourage amatuer astronomical
+observations and applications for the highly accurate vector
+astronomy that NOVAS and JPL Ephemeris DE430 provide.
+
+### Basic vector astronomy using NOVAS
 
 "The Naval Observatory Vector Astronomy Software (NOVAS) is a source-code
 library in Fortran, C and Python that provides common astrometric quantities
@@ -11,8 +36,17 @@ _NOVAS C 3.1 Guide_
 
 This project uses the NOVAS C-library to calculate the sky positions of
 the planets, Sun and Moon, from an observer at a fixed location on Earth.
+The latest version of the library, as of 2015-12-30, is NOVAS-C 3.1.
+Included in this repository is a patch file that applies fixes to two
+[known issues](http://aa.usno.navy.mil/software/novas/novas_faq.php)
+in this release.
 
-It leverages the general purpose planet ephemeris file DE430, published
+The known issues are:
+
+* sidereal_time units bug
+* ephem_close does not reset the EPHFILE pointer
+
+This project leverages the general purpose planet ephemeris file DE430, published
 15-Aug-2013 by the National Aeronautics and Space Administration (NASA)
 Jet Propulsion Laboratory (JPL). Following the instructions below, you
 will download the text files that make up DE430, along with Fortran
@@ -20,17 +54,14 @@ code that parses these and produces a binary ephemeris file for your
 architecture. Once the binary DE430 is built and tested, you will use
 it to build an example program in the NOVAS C distribution.
 
-Finally, a small application included in this project, `planets`, can
-be built to demonstrate some of the capabilities of NOVAS.
-
-The NOVAS C distribution and JPL Ephemeris and utility software are
-free to download from the publishers. Neither is provided here.
+Two small applications included in this project can
+be built to demonstrate some of the capabilities of NOVAS. (See below.)
 
 ![Screen shot of planets](demo.png)
 
 ### Instructions for creating binary JPL Ephemeris DE430
 
-These instructions were tested on FC19 and FC20 x86_64 Linux.
+These instructions were tested on FC19-22 x86_64 Linux.
 
 ### NOVAS References
 
@@ -185,9 +216,17 @@ make
 watch ./planets
 ```
 
-## Further Reading
+# Tropical
+
+The `tropical` program uses the ephemeris and NOVAS-C library to
+display the next two tropical moments (equinox and solstice).
+
+It uses the latitude of the subsolar point on Earth in its
+calculations. A local maximum or minimum latitude is the
+solstice, and the crossing of the Equator is the equinox.
+
+## Citation and Further Reading
 
 `Cdist/NOVAS_C3.1_Guide.pdf`
 
-Documents most of the functions in the NOVAS library.
-
+Bangert, J., Puatua, W., Kaplan, G., Bartlett, J., Harris, W., Fredericks, A., & Monet, A. (2011) User's Guide to NOVAS Version C3.1 (Washington, DC: USNO).

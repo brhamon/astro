@@ -14,6 +14,7 @@
 
 static const char bull_a_file_name[] = "finals2000A.daily";
 static const char bull_a_url[] = "http://maia.usno.navy.mil/ser7/finals2000A.daily";
+static const char bull_a_alt_url[] = "http://toshi.nofs.navy.mil/ser7/finals2000A.daily";
 
 static bull_a_entry_t *entries = NULL;
 static size_t nbr_of_entries = 0;

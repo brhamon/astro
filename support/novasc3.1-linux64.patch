@@ -1,6 +1,17 @@
+diff -rbU3 Cdist.orig/eph_manager.c Cdist/eph_manager.c
+--- Cdist.orig/eph_manager.c	2011-02-03 19:37:12.000000000 +0000
++++ Cdist/eph_manager.c	2015-12-31 00:58:48.000000000 +0000
+@@ -321,6 +321,7 @@
+    if (EPHFILE)
+    {
+       error =  (short int) fclose (EPHFILE);
++      EPHFILE = NULL; // new line, reset pointer
+       free (BUFFER);
+    }
+    return error;
 diff -rbU3 Cdist.orig/example.c Cdist/example.c
 --- Cdist.orig/example.c	2011-01-21 14:48:11.000000000 +0000
-+++ Cdist/example.c	2015-03-28 18:29:47.000000000 +0000
++++ Cdist/example.c	2015-12-31 00:54:59.000000000 +0000
 @@ -13,7 +13,6 @@
  #include <stdio.h>
  #include <stdlib.h>
@@ -55,7 +66,7 @@ diff -rbU3 Cdist.orig/example.c Cdist/example.c
  }
 diff -rbU3 Cdist.orig/jplint.f Cdist/jplint.f
 --- Cdist.orig/jplint.f	2011-01-21 14:48:10.000000000 +0000
-+++ Cdist/jplint.f	2015-03-13 22:22:59.000000000 +0000
++++ Cdist/jplint.f	2015-12-31 00:54:59.000000000 +0000
 @@ -72,7 +72,7 @@
  C     ('nvals') is known.
  
@@ -74,3 +85,15 @@ diff -rbU3 Cdist.orig/jplint.f Cdist/jplint.f
  
        CHARACTER name(cdim)*6
  
+diff -rbU3 Cdist.orig/novas.c Cdist/novas.c
+--- Cdist.orig/novas.c	2011-03-22 15:43:29.000000000 +0000
++++ Cdist/novas.c	2015-12-31 00:56:27.000000000 +0000
+@@ -3128,7 +3128,7 @@
+    For mean sidereal time, subtract the equation of the equinoxes.
+ */
+ 
+-         ha_eq -= (eqeq / 240.0);
++         ha_eq -= (eqeq / 3600.0);
+ 
+          ha_eq = fmod (ha_eq, 360.0) / 15.0;
+          if (ha_eq < 0.0)
