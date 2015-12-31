@@ -14,7 +14,7 @@ Neither is provided here.
 
 Instead, this project will simplify the process and provide
 sample executables. The operation is scripted for generic Linux
-platforms; however, a Windows/MSVC project is planned for the future.
+platforms.
 
 Included in this source code repository are two sample programs
 which use NOVAS-C to calculate the apparent position of the Sun
