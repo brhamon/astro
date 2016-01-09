@@ -13,8 +13,11 @@
 #include "bull_a.h"
 
 static const char bull_a_file_name[] = "finals2000A.daily";
-static const char bull_a_url[] = "http://maia.usno.navy.mil/ser7/finals2000A.daily";
-static const char bull_a_alt_url[] = "http://toshi.nofs.navy.mil/ser7/finals2000A.daily";
+static const char *bull_a_url[] = {
+    "http://maia.usno.navy.mil/ser7/finals2000A.daily",
+    "http://toshi.nofs.navy.mil/ser7/finals2000A.daily",
+    NULL
+};
 
 static bull_a_entry_t *entries = NULL;
 static size_t nbr_of_entries = 0;
@@ -61,7 +64,9 @@ static int fetch_url(const char* url, char* data, size_t data_size,
     };
     curl_easy_setopt(curl, CURLOPT_URL, url);
 
-    headers = curl_slist_append(headers, "User-Agent: Mozilla/5.0 (Windows NT 6.1; WOW64; rv:36.0) Gecko/20100101 Firefox/36.0");
+    headers = curl_slist_append(headers, "User-Agent: Mozilla/5.0 "
+            "(Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/48.0.2564.48 Safari/537.36");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
 
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_response);
@@ -128,6 +133,7 @@ int bull_a_init()
     char* file_buffer=NULL;
     char* p;
     char* p1;
+    char** url_iter;
     int status;
     int fd;
     bull_a_entry_t *entry;
@@ -146,7 +152,8 @@ int bull_a_init()
                 if (fd >= 0) {
                     offset = 0;
                     while (status == 0 && offset < file_size) {
-                        nbr_bytes = read(fd, file_buffer + offset, file_size - offset);
+                        nbr_bytes = read(fd, file_buffer + offset, file_size -
+                                offset);
                         if (nbr_bytes < 0) { // read failed
                             status = -1;
                         } else {
@@ -155,7 +162,8 @@ int bull_a_init()
                     }
                     close(fd);
                     if (status == 0) {
-                        printf("Read %9jd bytes from %s\n", offset, bull_a_file_name);
+                        printf("Read %9jd bytes from %s\n", offset,
+                                bull_a_file_name);
                     }
                 } else { // open failed
                     status = -1;
@@ -175,9 +183,18 @@ int bull_a_init()
         if (file_buffer == NULL) {
             status = -1;
         } else {
-            status = fetch_url(bull_a_url, file_buffer, BUFFER_SIZE, &file_size);
+            url_iter = &bull_a_url[0];
+            status = -1;
+            while (status != 0 && *url_iter != NULL) {
+                printf("  from %s\n", *url_iter);
+                status = fetch_url(*url_iter, file_buffer, BUFFER_SIZE,
+                        &file_size);
+                if (status != 0) {
+                    ++url_iter;
+                }
+            }
             if (status == 0) {
-                printf("Downloaded %9jd bytes from %s\n", file_size, bull_a_url);
+                printf("Downloaded %9jd bytes.\n", file_size);
                 fd = open(bull_a_file_name, O_CREAT|O_WRONLY, 0644);
                 if (fd >= 0) {
                     offset = 0;
