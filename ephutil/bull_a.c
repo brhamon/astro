@@ -133,7 +133,7 @@ int bull_a_init()
     char* file_buffer=NULL;
     char* p;
     char* p1;
-    char** url_iter;
+    const char** url_iter;
     int status;
     int fd;
     bull_a_entry_t *entry;

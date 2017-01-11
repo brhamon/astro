@@ -8,6 +8,7 @@ char *as_dms(char* buf, double val) {
     int deg, min;
     double tmp;
     int sign = 1;
+    char dbuf[8];
 
     if (val < 0.0) {
         sign = -1;
@@ -15,13 +16,14 @@ char *as_dms(char* buf, double val) {
     }
     tmp = floor(val);
     val -= tmp;
-    deg = (int)tmp * sign;
+    deg = (int)tmp;
     val *= 60.0;
     tmp = floor(val);
     val -= tmp;
     min = (int)tmp;
     val *= 60.0;
-    snprintf(buf, DMS_MAX, "%4dd%02d'%04.1f\"", deg, min, val);
+    snprintf(dbuf, sizeof(dbuf), "%s%d", sign < 0 ? "-" : "", deg);
+    snprintf(buf, DMS_MAX, "%4sd%02d'%04.1f\"", dbuf, min, val);
     return buf;
 }
 
@@ -47,14 +49,14 @@ char *as_hms(char* buf, double val) {
 
 void get_rtrim(char* out, size_t max_out, const char* in_beg, const char* in_end) {
     while (in_end > in_beg && in_end[-1] == ' ') {
-	--in_end;
+    --in_end;
     }
     if (in_end > in_beg) {
-	size_t len = in_end - in_beg;
-	if (len > max_out) {
-	    len = max_out;
-	}
-	memcpy(out, in_beg, len);
+    size_t len = in_end - in_beg;
+    if (len > max_out) {
+        len = max_out;
+    }
+    memcpy(out, in_beg, len);
     }
 }
 
