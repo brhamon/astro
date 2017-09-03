@@ -22,6 +22,9 @@
 #include <unistd.h>
 #include <time.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 static char our_prog_name[64];
 
@@ -30,6 +33,7 @@ static char our_prog_name[64];
  */
 int f_azi_s = 0;
 int f_bull_a = 1;
+static const char obs_file_name[] = "obs.dat";
 
 /*
  * Information for Polaris (HD8890) is taken from the SKY2000 Master Catalog, Version 5.
@@ -344,7 +348,8 @@ static void usage() {
            "  -T NUMBER\n"
            "    Observer's air temperature in degrees Celcius\n"
            "  -P NUMBER\n"
-           "    Observer's air pressure in millibars\n"
+           "    Observer's air pressure in millibars. To convert inches to\n"
+           "    millibars, multiply by 33.8637526.\n"
            "  -t TIME\n"
            "    UTC time (24-hour format) as appropriate for the system locale\n"
            "  -d DATE\n"
@@ -354,6 +359,8 @@ static void usage() {
            "  -a\n"
            "    Express azimuth as \"degrees west of South\", rather than\n"
            "    \"degrees east of North\".\n"
+           "  -s\n"
+           "    Save observer parameters as defaults for future runs.\n"
            "  -v\n"
            "    Verbose output\n"
            "  -h\n"
@@ -377,10 +384,37 @@ int main(int argc, char *argv[]) {
         .temperature = 15.0,
         .pressure = 1026.4
     };
+    make_local_path();
+    char workpath[PATH_MAX];
+    int sz = snprintf(workpath, sizeof(workpath), "%s/%s", g_local_path, obs_file_name);
+    if (sz < 0 || (size_t)sz >= sizeof(workpath)) {
+        printf("error: unable to form observer pathname.\n");
+        exit(1);
+    }
+    printf_if(2, "Observer pathname: \"%s\"\n", workpath);
+    int fd = open(workpath, O_RDONLY);
+    if (fd < 0) {
+        printf_if(2, "No observer defaults found.\n");
+    } else {
+        ssize_t bytes_read = read(fd, &obs, sizeof(obs));
+        if (bytes_read < 0) {
+            printf_if(1, "warning: observer defaults read error.\n");
+        } else {
+            if ((size_t)bytes_read != sizeof(obs)) {
+                printf_if(1, "warning: observer defaults read %zd bytes (expecting %zu).\n",
+                        bytes_read, sizeof(obs));
+            } else {
+                printf_if(2, "observer defaults loaded.\n");
+            }
+        }
+        close(fd);
+    }
+
     time_now_utc(&obs.utc);
+    int f_save_obs = 0;
 
     for (;;) {
-        int c = getopt(argc, argv, ":l:L:H:T:P:t:d:vaAh");
+        int c = getopt(argc, argv, ":l:L:H:T:P:t:d:vasAh");
         if (c == -1) {
             break;
         }
@@ -409,6 +443,9 @@ int main(int argc, char *argv[]) {
             case 'a':
                 f_azi_s = 1;
                 break;
+            case 's':
+                f_save_obs = 1;
+                break;
             case 'A':
                 f_bull_a = 0;
                 break;
@@ -422,6 +459,25 @@ int main(int argc, char *argv[]) {
                 usage();
                 return 1;
         }
+    }
+    if (f_save_obs) {
+        fd = open(workpath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+        if (fd < 0) {
+            printf("Warning: Cannot save observer defaults.\n");
+        } else {
+            ssize_t bytes_written = write(fd, &obs, sizeof(obs));
+            if (bytes_written < 0) {
+                printf("Warning: observer defaults write error.\n");
+            } else {
+                if ((size_t)bytes_written != sizeof(obs)) {
+                    printf("warning: observer defaults wrote %zd bytes (expecting %zu).\n",
+                            bytes_written, sizeof(obs));
+                } else {
+                    printf_if(1, "info: observer defaults saved.\n");
+                }
+            }
+        }
+        close(fd);
     }
     return planets_main(&obs);
 }

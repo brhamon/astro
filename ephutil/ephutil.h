@@ -1,6 +1,8 @@
 #if !defined(EPHUTIL_H_)
 #define EPHUTIL_H_
 
+#include <limits.h>
+
 /*
 coord_sys:
 0 ... GCRS or "local GCRS"
@@ -102,6 +104,7 @@ static inline int signs_diff(double a, double b) {
 struct tm;  // fwd ref
 
 extern int g_verbosity;
+extern char g_local_path[PATH_MAX];
 
 extern double time_to_jd(const struct tm *bdtm);
 extern int time_now_utc(struct tm *bdtm);
@@ -135,6 +138,7 @@ extern double normalize(double val, double period);
 
 extern double leapsec_tai_utc(double jd_utc);
 extern void printf_if(int min_ver, const char *format, ...);
+extern void make_local_path();
 
 /*
  * bracket_roots -- Divide <in_range> into <intervals>, then look for sign

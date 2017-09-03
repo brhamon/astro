@@ -13,6 +13,9 @@
 #include "bull_a.h"
 #include "ephutil.h"
 
+static const char astro_dir[] = ".astro";
+char g_local_path[PATH_MAX] = { 0, };
+
 static const char bull_a_file_name[] = "finals2000A.daily";
 static const char *bull_a_url[] = {
     "http://maia.usno.navy.mil/ser7/finals2000A.daily",
@@ -50,7 +53,6 @@ static int fetch_url(const char* url, char* data, size_t data_size,
         size_t* nbr_of_bytes) {
     CURL* curl=NULL;
     CURLcode status;
-    struct curl_slist *headers=NULL;
     long code;
 
     curl_global_init(CURL_GLOBAL_ALL);
@@ -64,12 +66,6 @@ static int fetch_url(const char* url, char* data, size_t data_size,
         .sz = data_size
     };
     curl_easy_setopt(curl, CURLOPT_URL, url);
-
-    headers = curl_slist_append(headers, "User-Agent: Mozilla/5.0 "
-            "(Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/48.0.2564.48 Safari/537.36");
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_response);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &write_result);
 
@@ -87,7 +83,6 @@ static int fetch_url(const char* url, char* data, size_t data_size,
     }
 
     curl_easy_cleanup(curl);
-    curl_slist_free_all(headers);
     curl_global_cleanup();
 
     data[write_result.pos] = '\0';
@@ -97,9 +92,6 @@ static int fetch_url(const char* url, char* data, size_t data_size,
 error:
     if (curl) {
         curl_easy_cleanup(curl);
-    }
-    if (headers) {
-        curl_slist_free_all(headers);
     }
     curl_global_cleanup();
     return -1;
@@ -125,6 +117,80 @@ static double get_double(char* p, size_t len) {
     return val;
 }
 
+/*
+ * Fill in the global g_local_path with "~/.astro", if HOME is present in the environment.
+ * Otherwise, use "./.astro".
+ * Create g_local_path, if necessary.
+ * Terminate if errors are encountered.
+ */
+void make_local_path()
+{
+    if (*g_local_path != 0) {
+        printf_if(2, "info: local_path already assigned: \"%s\".\n", g_local_path);
+        return;
+    }
+    struct stat buffer;
+    int status;
+    const char *description = "";
+    const char *home = getenv("HOME");
+
+    if (home == NULL) {
+        if (getcwd(g_local_path, sizeof(g_local_path)) != NULL) {
+            description = "current";
+        } else {
+            printf("error: getcwd failed.\n");
+            exit(1);
+        }
+    } else {
+        strncpy(g_local_path, home, sizeof(g_local_path));
+        g_local_path[sizeof(g_local_path)-1] = 0;
+        description = "home";
+    }
+    char *p = strchr(g_local_path, 0);
+    if (p == NULL || p < g_local_path || (size_t)(p - g_local_path) >= PATH_MAX) {
+        printf("error: invalid %s value in environment.\n", description);
+        exit(1);
+    }
+    status = stat(g_local_path, &buffer);
+    if (status == 0) {
+        if (S_ISDIR(buffer.st_mode)) {
+            printf_if(2, "info: %s directory: \"%s\".\n", description, g_local_path);
+        } else {
+            printf("error: %s is not a directory.\n", description);
+            exit(1);
+        }
+    } else {
+        printf("error: %s directory missing.\n", description);
+        exit(1);
+    }
+
+    size_t worksz = PATH_MAX - (size_t)(p - g_local_path);
+    int sz = snprintf(p, worksz, "/%s", astro_dir);
+    if (sz < 0 || (size_t)sz >= worksz) {
+        printf("error: unable to form astro directory path.\n");
+        exit(1);
+    }
+    p += sz;
+    worksz -= sz;
+
+    status = stat(g_local_path, &buffer);
+    if (status == 0) {
+        if (S_ISDIR(buffer.st_mode)) {
+            printf_if(2, "info: local path \"%s\" is an existing directory.\n", g_local_path);
+        } else {
+            printf("error: local path \"%s\" exists, but is not a directory.\n", g_local_path);
+            exit(1);
+        }
+    } else {
+        if (mkdir(g_local_path, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) == 0) {
+            printf_if(2, "info: local path \"%s\" created.\n", g_local_path);
+        } else {
+            printf("error: unable to create work directory \"%s\".\n", g_local_path);
+            exit(1);
+        }
+    }
+}
+
 int bull_a_init()
 {
     struct stat buffer;
@@ -137,10 +203,19 @@ int bull_a_init()
     const char** url_iter;
     int status;
     int fd;
+    char workpath[PATH_MAX];
     bull_a_entry_t *entry;
 
     age = time(NULL);
-    status = stat(bull_a_file_name, &buffer);
+    make_local_path();
+    int sz = snprintf(workpath, sizeof(workpath), "%s/%s", g_local_path, bull_a_file_name);
+    if (sz < 0 || (size_t)sz >= sizeof(workpath)) {
+        printf("error: unable to form Bulletin A pathname.\n");
+        exit(1);
+    }
+    printf_if(2, "Bulletin A pathname: \"%s\"\n", workpath);
+
+    status = stat(workpath, &buffer);
     if (status == 0) {
         file_size = (size_t)buffer.st_size;
         age -= buffer.st_mtime;
@@ -149,7 +224,7 @@ int bull_a_init()
             if (file_buffer == NULL) { // malloc failed
                 status = -1;
             } else {
-                fd = open(bull_a_file_name, O_RDONLY);
+                fd = open(workpath, O_RDONLY);
                 if (fd >= 0) {
                     offset = 0;
                     while (status == 0 && offset < file_size) {
@@ -196,7 +271,7 @@ int bull_a_init()
             }
             if (status == 0) {
                 printf_if(1, "Downloaded %9jd bytes.\n", file_size);
-                fd = open(bull_a_file_name, O_CREAT|O_WRONLY, 0644);
+                fd = open(workpath, O_CREAT|O_WRONLY, 0644);
                 if (fd >= 0) {
                     offset = 0;
                     while (status == 0 && offset < file_size) {
