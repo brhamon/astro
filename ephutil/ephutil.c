@@ -95,29 +95,37 @@ double leapsec_tai_utc(double jd_utc) {
     return leap->tai_utc;
 }
 
+double time_to_jd(const struct tm *bdtm) {
+    short int year = bdtm->tm_year + 1900;
+    short int month = bdtm->tm_mon + 1;
+    short int day = bdtm->tm_mday;
+    double hour = (double)(bdtm->tm_hour * 3600 + bdtm->tm_min * 60 + bdtm->tm_sec) / 3600.0;
+    printf_if(1, "UTC: %02d/%02d/%04d hour=%12.6f\n", month, day, year, hour);
+    return julian_date(year, month, day, hour);
+}
+
+int time_now_utc(struct tm *bdtm) {
+    time_t now;
+
+    time(&now);
+    if (gmtime_r(&now, bdtm) != NULL) {
+        return 1;
+    } else {
+        printf("Error obtaining local time.\n");
+        return 0;
+    }
+}
+
 /*
  * Obtain the JD UTC from the system clock, with accuracy of 1.0 seconds.
  */
 double get_jd_utc() {
-    short int year = 2000;
-    short int month = 1;
-    short int day = 1;
-    double hour = 0.0;
-
-    time_t now;
     struct tm bdtm;
-
-    time(&now);
-    if (gmtime_r(&now, &bdtm) != NULL) {
-        year = bdtm.tm_year + 1900;
-        month = bdtm.tm_mon + 1;
-        day = bdtm.tm_mday;
-        hour = (double)(bdtm.tm_hour * 3600 + bdtm.tm_min * 60 + bdtm.tm_sec) / 3600.0;
-        printf("UTC: %02d/%02d/%04d hour=%12.6f\n", month, day, year, hour);
+    if (time_now_utc(&bdtm)) {
+        return time_to_jd(&bdtm);
     } else {
-        printf("Error obtaining local time.\n");
+        return 0.0;
     }
-    return julian_date(year,month,day,hour);
 }
 
 /*
@@ -205,7 +213,7 @@ double get_eph_const(const char* nam) {
     int nam_len = strlen(nam);
     if (0 < nam_len && nam_len <= 6) {
 	strcpy(key.nam, nam);
-	res = bsearch(&key, eph_consts, nbr_of_eph_consts, sizeof(eph_const_t), 
+	res = bsearch(&key, eph_consts, nbr_of_eph_consts, sizeof(eph_const_t),
 		cmp_eph_const);
 	if (res != NULL) {
 	    return res->val;

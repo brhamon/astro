@@ -1,12 +1,10 @@
 /*
- *  tropical.c: Display the next two tropical moments
+ *  tropical.c: Display upcoming tropical moments
  *
- *  A tropical moment is one of the four points in the
- *  tropical year known as a "solstice" or an "equinox."
- *  The solstice corresponds to the local maximum or
- *  minimum of the latitude of the subsolar point,
- *  and the equinox corresponds to the crossing of the
- *  equator by the subsolar point.
+ *  A tropical moment is one of the four points in the tropical year known
+ *  as a "solstice" or an "equinox." The solstice corresponds to the local
+ *  maximum or minimum of the latitude of the subsolar point, and the equinox
+ *  corresponds to the crossing of the equator by the subsolar point.
  *
  *  Derived from software developed by:
  *
@@ -18,17 +16,11 @@
 #include <novas.h>
 #include <ephutil.h>
 #include <string.h>
+#include <stdlib.h>
 #include "bull_a.h"
 
-/* at epoch J2000.0 */
-static const double sidereal_year_in_days = 365.256363004;
-static const double one_second_jd = 1.0 / 86400.0;
-
-typedef struct {
-    double jd;
-    double lat;
-    double lon;
-} moment_t;
+static object sol;
+static short int accuracy;
 
 /*
  * Calculate the geodesic coordinates of the subsolar point. (Or the
@@ -37,7 +29,6 @@ typedef struct {
  */
 short int transit_coord(time_parameters_t* tp, object* obj,
         double x_pole, double y_pole,
-        short int accuracy,
         double* lat, double* lon)
 {
     short int error = 0;
@@ -66,8 +57,7 @@ short int transit_coord(time_parameters_t* tp, object* obj,
     return error;
 }
 
-short int calculate_sample(moment_t* sample_ptr, double jd, object* sol_ptr,
-        short int accuracy) {
+short int sample_transit_coord(moment_t* sample_ptr, double jd) {
     double x_pole, y_pole, ut1_utc; // Bulletin A corrective factors
     double lon, lat;                // transit coordinates
     time_parameters_t timep;
@@ -86,7 +76,7 @@ short int calculate_sample(moment_t* sample_ptr, double jd, object* sol_ptr,
     }
     make_time_parameters(&timep, jd, ut1_utc);
     /* Calculate Solar transit info. */
-    if ((error = transit_coord(&timep, sol_ptr, x_pole, y_pole, accuracy, &lat, &lon))
+    if ((error = transit_coord(&timep, &sol, x_pole, y_pole, &lat, &lon))
             != 0) {
         printf("Error %d in transit_coord.", error);
         return error;
@@ -97,205 +87,90 @@ short int calculate_sample(moment_t* sample_ptr, double jd, object* sol_ptr,
     return error;
 }
 
-/*
- * Define the index of the samples for ALPHA (lower bound),
- * BETA (upper bound), and GAMMA (mid-point).
- */
-#define ALPHA          0
-#define GAMMA          1
-#define BETA           2
-#define NBR_OF_SAMPLES 3
-
-#define FALSE 0
-#define TRUE (!FALSE)
-
-short int calculate_next_equinox(moment_t* equinox, double cur_j, object* sol_ptr,
-        short int accuracy) {
-    short int error = 0;
-    int index;
-    moment_t sample[NBR_OF_SAMPLES];
-    int equ_type = 0;
-    cur_j -= sidereal_year_in_days * 0.2;
-    int sum = 0;
-    int f_once = FALSE;
-    int f_goleft = FALSE;
-    /*
-     * Coarse find. Take samples of the transit coordinates in one-fifth year
-     * resolution.
-     */
-    index = 0;
-    for (;;) {
-        for (; index < NBR_OF_SAMPLES; index++) {
-            if ((error = calculate_sample(&sample[index], cur_j, sol_ptr, accuracy))
-                    != 0) {
-                printf("Error %d in calculate_sample.", error);
-                return error;
-            }
-            sum += (sample[index].lat < 0.0) ? -1 : 1;
-            cur_j += sidereal_year_in_days * 0.2;
-        }
-        /*
-         *    sample
-         *   0   1   2  sum   interpretation
-         * [-1, -1, -1]  -3   Too close to December solstice. Advance & retry
-         * [-1, -1,  1]  -1   March equinox is after sample[GAMMA].jd
-         * [-1,  1, -1]  -1   Impossible! (sampling range is only 0.4 year)
-         * [-1,  1,  1]   1   March equinox is before sample[GAMMA].jd
-         * [ 1, -1, -1]  -1   September equinox is before sample[GAMMA].jd
-         * [ 1, -1,  1]   1   Impossible! (sampling range is only 0.4 year)
-         * [ 1,  1, -1]   1   September equinox is after sample[GAMMA].jd
-         * [ 1,  1,  1]   3   Too close to June solstice. Advance & retry
-         */
-        if (sum == 1) {
-            if (sample[ALPHA].lat < 0.0) {
-                /* March equinox is before sample[GAMMA].jd */
-                /*
-                 * Only go 'left' if this is not the first loop iteration.
-                 * This restriction keeps this function from seeking a moment
-                 * prior to the input Julian Date.
-                 */
-                if (f_once) {
-                    f_goleft = TRUE;
-                    break;
-                }
-            } else {
-                /* September equinox is after sample[GAMMA].jd */
-                equ_type = -1;
-                break;
-            }
-        } else if (sum == -1) {
-            if (sample[BETA].lat >= 0.0) {
-                /* March equinox is after sample[GAMMA].jd */
-                equ_type = 1;
-                break;
-            } else {
-                /* September equinox is before sample[GAMMA].jd */
-                if (f_once) {
-                    f_goleft = TRUE;
-                    break;
-                }
-            }
-        } else if (sum != 3 && sum != -3) {
-            printf("Logic error! sum=%d\n", sum);
-            error = 1;
-            return error;
-        }
-        --index;
-        sum -= (sample[ALPHA].lat < 0.0) ? -1 : 1;
-        memmove(&sample[ALPHA], &sample[GAMMA], 2*sizeof(moment_t));
-        f_once = TRUE;
+double subsolar_latitude(double jd) {
+    moment_t mom;
+    short int error = sample_transit_coord(&mom, jd);
+    if (error != 0) {
+        printf("%s: Error %d returned from sample_transit_coord.\n", __func__,
+                error);
+        exit(1);
     }
-    if (f_goleft) {
-        /* go left */
-        sample[BETA] = sample[GAMMA];
-    } else {
-        /* go right */
-        sample[ALPHA] = sample[GAMMA];
-    }
-    for (;;) {
-        if ((sample[BETA].jd - sample[ALPHA].jd) < one_second_jd) {
-            break;
-        }
-        cur_j = (sample[BETA].jd + sample[ALPHA].jd) / 2.0;
-        if ((error = calculate_sample(&sample[GAMMA], cur_j, sol_ptr, accuracy)) != 0) {
-            printf("Error %d in calculate_sample.", error);
-            return error;
-        }
-        /* March:   ALPHA sample positive, BETA sample negative
-         *    lat positive => go right
-         * September: ALPHA sample negative, BETA sample positive
-         *    lat positive => go left
-         */
-        if ((equ_type < 0 && sample[GAMMA].lat < 0.0) ||
-                (equ_type > 0 && sample[GAMMA].lat > 0.0)) {
-            /* go left */
-            sample[BETA] = sample[GAMMA];
-        } else {
-            /* go right */
-            sample[ALPHA] = sample[GAMMA];
-        }
-    }
-    *equinox = sample[ALPHA];
-    return error;
+    return mom.lat;
 }
 
-short int calculate_next_solstice(moment_t* moment, double cur_j, object* sol_ptr,
-        short int accuracy) {
-    int index;
-    moment_t sample[NBR_OF_SAMPLES];
-    int sol_type = 0;
-    short int error = 0;
-    cur_j -= sidereal_year_in_days * 0.4;
-    for (;;) {
-        for (index = 0; index < NBR_OF_SAMPLES; index++) {
-            if ((error = calculate_sample(&sample[index], cur_j, sol_ptr, accuracy))
-                    != 0) {
-                return error;
-            }
-            cur_j += sidereal_year_in_days * 0.4;
-        }
-        if (sample[GAMMA].lat > 0.0) {
-            if (sample[ALPHA].lat < sample[BETA].lat) {
-                sol_type = 1; /* June solstice */
-                cur_j = sample[GAMMA].jd +
-                    sidereal_year_in_days * (sample[ALPHA].lat < 0.0 ? 0.25 : 0.15);
-                break;
-            }
-        } else {
-            if (sample[ALPHA].lat > sample[BETA].lat) {
-                sol_type = -1; /* December solstice */
-                cur_j = sample[GAMMA].jd +
-                    sidereal_year_in_days * (sample[ALPHA].lat > 0.0 ? 0.25 : 0.15);
-                break;
-            }
-        }
-        cur_j = sample[GAMMA].jd + sidereal_year_in_days * 0.2;
-    }
-    /* exit conditions: 
-     * sample[GAMMA] is *before* the target solstice
-     * cur_j is *after* the target solstice
-     * There is exactly one solstice of type sol_type in between.
-     */
-    sample[ALPHA] = sample[GAMMA];
-    if ((error = calculate_sample(&sample[BETA], cur_j, sol_ptr, accuracy)) != 0) {
-        return error;
-    }
+int find_moments(double cur_jd, moment_t* outs, int outs_sz)
+{
+    int nbr_of_roots;
+    int i;
+    real_range hint;
+    real_range ranges[12];
+    double midp;
+    double sol_jd;
+    short int error;
+    int nbr_of_outs=0;
 
-    for (;;) {
-        cur_j = (sample[BETA].jd + sample[ALPHA].jd) / 2.0;
-        if ((sample[BETA].jd - sample[ALPHA].jd) < one_second_jd) {
-            break;
-        }
-        if ((error = calculate_sample(&sample[GAMMA], cur_j, sol_ptr, accuracy)) != 0) {
-            return error;
-        }
+    hint.lb = cur_jd - (sidereal_year_in_days * 0.51);
+    hint.ub = cur_jd + (sidereal_year_in_days * 1.02);
 
-        /* December:
-         *    take GAMMA and MIN(ALPHA, BETA)
-         * June:
-         *    take GAMMA and MAX(ALPHA, BETA)
-         */
-        if ((sol_type < 0 && sample[ALPHA].lat < sample[BETA].lat) ||
-                (sol_type > 0 && sample[ALPHA].lat > sample[BETA].lat)) {
-            /* GO LEFT */
-            sample[BETA] = sample[GAMMA];
-        } else {
-            /* GO RIGHT */
-            sample[ALPHA] = sample[GAMMA];
+    nbr_of_roots = bracket_roots(subsolar_latitude, &hint, NELTS(ranges), ranges,
+            NELTS(ranges));
+    if (nbr_of_roots < 3 || nbr_of_roots > 4) {
+        printf("%s: ERROR incorrect number of roots found (%d).\n", __func__,
+                nbr_of_roots);
+        exit(1);
+    }
+    for (i=0; i < nbr_of_roots; ++i) {
+        hint.lb = hint.ub;
+        hint.ub = zbrent(subsolar_latitude, &ranges[i], one_second_jd);
+        if (i != 0) {
+            midp=0.5*(hint.ub + hint.lb);
+            (void)brent(hint.lb, midp, hint.ub, subsolar_latitude, one_second_jd,
+                    &sol_jd, subsolar_latitude(midp) < 0.0);
+            if (sol_jd >= cur_jd) {
+                if (++nbr_of_outs < outs_sz) {
+                    error = sample_transit_coord(outs, sol_jd);
+                    if (error != 0) {
+                        printf("%s(%d): ERROR %d returned from "
+                                "sample_transit_coord.\n", __func__, __LINE__,
+                                error);
+                        exit(1);
+                    }
+                    ++outs;
+                }
+            }
+        }
+        if (hint.ub >= cur_jd) {
+            if (++nbr_of_outs < outs_sz) {
+                error = sample_transit_coord(outs, hint.ub);
+                if (error != 0) {
+                    printf("%s(%d): ERROR %d returned from "
+                            "sample_transit_coord.\n", __func__, __LINE__,
+                            error);
+                    exit(1);
+                }
+                ++outs;
+            }
         }
     }
-    *moment = sample[ALPHA];
-    return error;
+    return nbr_of_outs;
 }
 
 static const char* tropical_moment_names[] = {
     "March", "June", "September", "December"
 };
 
-void display_moment(const char* moment_str, moment_t* moment) {
+static const char* tropical_moment_types[] = {
+    "equinox", "solstice", "equinox", "solstice"
+};
+
+void display_moment(moment_t* moment)
+{
     double cur_j;
     short int year, month, day;
     short int hour, minute, second;
+    int mom;
+    char d1[DMS_MAX];
+    char d2[DMS_MAX];
 
     cal_date(moment->jd, &year, &month, &day, &cur_j);
     hour = (short int)floor(cur_j);
@@ -305,24 +180,45 @@ void display_moment(const char* moment_str, moment_t* moment) {
     cur_j -= (double)minute;
     cur_j *= 60.0;
     second = (short int)floor(cur_j);
+    mom = (month-1)/3;
+    if (mom < 0 || mom > 3) {
+        printf("%s: LOGIC ERROR moment (%d) out of range.\n", __func__, mom);
+        exit(1);
+    }
 
     printf("%s %s occurs at %d-%02d-%02d %02d:%02d:%02d UTC\n",
-            tropical_moment_names[(month-1)/3],
-            moment_str, year, month, day, hour, minute, second);
-    printf("Subsolar point: {%15.10f %15.10f}\n", moment->lat, moment->lon);
+            tropical_moment_names[mom], tropical_moment_types[mom],
+            year, month, day, hour, minute, second);
+    printf("  Subsolar point: {%s %s} [{%.10lf, %.10lf}]\n", as_dms(d1, moment->lat, 1),
+            as_dms(d2, moment->lon, 0), moment->lat, moment->lon);
+}
+
+void list_next_moments(int years)
+{
+    int pass;
+    int i;
+    int nbr_m;
+    double cur_jd = get_jd_utc() - 5;
+    moment_t m[6];
+    for (pass=0; pass < years; ++pass) {
+        nbr_m = find_moments(cur_jd, &m[0], NELTS(m));
+        if (nbr_m == 0) {
+            printf("%s: ERROR found no moments.\n", __func__);
+            exit(1);
+        }
+        for (i=0; i<nbr_m; ++i) {
+            display_moment(&m[i]);
+        }
+        cur_jd = m[nbr_m-1].jd + 1.0;
+    }
 }
 
 int main(void) {
-    double cur_j;
-    moment_t solstice;
-    moment_t equinox;
     cat_entry dummy_star;
-    object sol;
     short int error = 0;
-    short int accuracy = 0;
-
     char ttl[85];
 
+    accuracy = 0;
     if ((error = bull_a_init()) != 0) {
         printf("Error %d from bull_a_init.", error);
         return error;
@@ -339,23 +235,7 @@ int main(void) {
         return error;
     }
 
-    cur_j = get_jd_utc() - 1;
-    if ((error = calculate_next_solstice(&solstice, cur_j, &sol, accuracy)) != 0) {
-        printf("Error %d in calculate_next_solstice\n", error);
-        return error;
-    }
-    if ((error = calculate_next_equinox(&equinox, cur_j, &sol, accuracy)) != 0) {
-        printf("Error %d in calculate_next_equinox\n", error);
-        return error;
-    }
-    if (solstice.jd < equinox.jd) {
-        display_moment("solstice", &solstice);
-        display_moment("equinox", &equinox);
-    } else {
-        display_moment("equinox", &equinox);
-        display_moment("solstice", &solstice);
-    }
-
+    list_next_moments(2);
     bull_a_cleanup();
 
     return 0;

@@ -19,7 +19,7 @@ Linux platforms.
 Included in this source code repository are two sample programs
 which use NOVAS-C to calculate the apparent position of the Sun
 and planets from an observation point on Earth, and a program to
-display the next two tropical moments (equinox and solstice).
+display upcoming tropical moments (equinox and solstice).
 
 The goal of this project is to encourage amatuer astronomical
 observations and applications for the highly accurate vector
@@ -44,7 +44,7 @@ The setup script will also apply fixes for the two (as of 2015-Jan-09)
 in NOVAS-C 3.1.
 
 This project uses the general purpose planetary ephemeris file DE430, published
-15-Aug-2013 by the National Aeronautics and Space Administration 
+15-Aug-2013 by the National Aeronautics and Space Administration
 Jet Propulsion Laboratory (NASA JPL, or simply "JPL"). Following the instructions
 below, you will download the text files that make up JPL DE430, along with FORTRAN
 code that parses these and produces a binary ephemeris file.
@@ -58,7 +58,7 @@ be built to demonstrate some of the capabilities of NOVAS-C. (See below.)
 
 ### Instructions for creating the binary JPL DE430
 
-These instructions were tested on FC19-22 x86_64 Linux.
+These instructions were tested on FC19-25 x86_64 Linux.
 
 ### NOVAS-C References
 
@@ -199,7 +199,7 @@ You have built and tested NOVAS-C with JPL DE430.
 
 ## Doesn't JPL supply binary ephemerides?
 
-Yes, JPL offers binary versions of DE430 on their FTP server. 
+Yes, JPL offers binary versions of DE430 on their FTP server.
 In particular, the [Linux](ftp://ssd.jpl.nasa.gov/pub/eph/planets/Linux/de430/linux_p1550p2650.430)
 binary ephemeris should match identically the ephemeris you just built
 on 64-bit Linux systems. To confirm, run the following command:
@@ -261,12 +261,13 @@ in millibars.
 ```
 cd ../planets
 make
+./planets -h
 watch ./planets
 ```
 
 ## Tropical
 
-The `tropical` displays the next two upcoming tropical moments
+The `tropical` program displays upcoming tropical moments
 (equinox and solstice).
 
 It uses the latitude of the subsolar point on Earth in its

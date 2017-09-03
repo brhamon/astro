@@ -55,30 +55,75 @@ typedef struct time_parameters_t_ {
     double delta_t;
 } time_parameters_t;
 
-#define DMS_MAX 14
+#define DMS_MAX 15
 #define HMS_MAX 13
 
-double get_jd_utc();
-void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc);
-char *as_dms(char* buf, double val);
-char *as_hms(char* buf, double val);
+/* at epoch J2000.0 */
+static const double sidereal_year_in_days = 365.256363004;
+static const double one_second_jd = 1.0 / 86400.0;
 
-void get_rtrim(char* out, size_t max_out, const char* in_beg, const char* in_end);
-int get_int(const char* cp, size_t len);
-double get_double(const char* cp, size_t len);
+typedef struct {
+    double jd;
+    double lat;
+    double lon;
+} moment_t;
+
+typedef double basic_fn(double jd);
+
+#define NELTS(array) ((int)(sizeof(array)/sizeof(array[0])))
+
+typedef struct {
+    double lb;
+    double ub;
+} real_range;
+
+typedef struct {
+    double x;
+    double fx;
+} real_point;
+
+typedef struct {
+    real_point lb;
+    real_point ub;
+} real_range_point;
+
+static inline int is_neg(double a) {
+    return a < 0.0;
+}
+
+static inline int signs_same(double a, double b) {
+    return (is_neg(a) ^ is_neg(b)) == 0;
+}
+
+static inline int signs_diff(double a, double b) {
+    return !signs_same(a, b);
+}
+
+struct tm;  // fwd ref
+
+extern int g_verbosity;
+
+extern double time_to_jd(const struct tm *bdtm);
+extern int time_now_utc(struct tm *bdtm);
+extern double get_jd_utc();
+extern void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc);
+extern char *as_dms(char* buf, double val, int is_latitude);
+extern char *as_hms(char* buf, double val);
+
+extern void get_rtrim(char* out, size_t max_out, const char* in_beg, const char* in_end);
 
 #define NBR_OF_PLANETS 11
-const planet_t the_planets[NBR_OF_PLANETS];
+extern const planet_t the_planets[NBR_OF_PLANETS];
 
-void init_eph_const();
-void free_eph_const();
-double get_eph_const(const char* nam);
+extern void init_eph_const();
+extern void free_eph_const();
+extern double get_eph_const(const char* nam);
 
 /*
  * Read the title string that appears at the beginning of every JPL binary ephemeris
  * file.
  */
-int get_eph_title(char* out_str, int out_len, const char* eph_name);
+extern int get_eph_title(char* out_str, int out_len, const char* eph_name);
 
 /* normalize a periodic value
  * return a double in the range [0.0, period) which represents
@@ -86,7 +131,24 @@ int get_eph_title(char* out_str, int out_len, const char* eph_name);
  * return the phase of theta in radians. normalize( julian_date, 7.0 )
  * will return the day-of-the-week for the given julian_date.
  */
-double normalize(double val, double period);
+extern double normalize(double val, double period);
 
-double leapsec_tai_utc(double jd_utc);
+extern double leapsec_tai_utc(double jd_utc);
+extern void printf_if(int min_ver, const char *format, ...);
+
+/*
+ * bracket_roots -- Divide <in_range> into <intervals>, then look for sign
+ * changes in the value of <func> over the subintervals. Return the number
+ * of subintervals that bracket a root of <func>. Store the first
+ * <out_ranges_size> root-bracketing intervals in <out_ranges>.
+ * A return value equal to out_ranges_size indicates that
+ * truncation may have taken place; therefore, callers should provide
+ * space for one more than the expected number of root-bracketing
+ * intervals.
+ */
+int bracket_roots(basic_fn func, const real_range *in_range, int intervals,
+        real_range out_ranges[], int out_ranges_size);
+double zbrent(basic_fn func, const real_range *in_range, double tol);
+double brent(double ax, double bx, double cx, basic_fn func, double tol,
+        double *xmin, int f_find_min);
 #endif

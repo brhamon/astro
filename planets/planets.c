@@ -10,6 +10,7 @@
  */
 
 #define USING_SOLSYSV2
+#define _XOPEN_SOURCE
 
 #if !defined(USING_SOLSYSV2)
 #include "eph_manager.h"
@@ -18,6 +19,17 @@
 #include <ephutil.h>
 #include <moon.h>
 #include "bull_a.h"
+#include <unistd.h>
+#include <time.h>
+#include <string.h>
+
+static char our_prog_name[64];
+
+/*
+ * Global settings.
+ */
+int f_azi_s = 0;
+int f_bull_a = 1;
 
 /*
  * Information for Polaris (HD8890) is taken from the SKY2000 Master Catalog, Version 5.
@@ -56,8 +68,8 @@ short int display_rotation(time_parameters_t* tp, on_surface* lp, short int accu
 
     theta = era(tp->jd_ut1, 0.0);
 
-    printf("Sidereal time: Greenwich=%16.11f, local=%16.11f\n", gast, last);
-    printf("ERA %15.10f\n\n", theta);
+    printf_if(1, "Sidereal time: Greenwich=%16.11f, local=%16.11f\n", gast, last);
+    printf_if(1, "ERA %15.10f\n\n", theta);
     return 0;
 }
 
@@ -96,18 +108,36 @@ short int transit_coord(time_parameters_t* tp, object* obj,
     return error;
 }
 
+struct obs {
+    double latitude;
+    double longitude;
+    double height;
+    double temperature;
+    double pressure;
+    struct tm utc;
+};
+
 /*
- * Kerry Shetline's excellent SkyViewCafe presents ZD as "Altitude",
- * and Azimuth is presented as "degrees West of South".
+ * NASA JPL expresses azimuth as degrees East of North, which is
+ * the default representation. However, Kerry Shetline's excellent
+ * SkyViewCafe presents ZD as "Altitude", and Azimuth is presented
+ * as "degrees West of South".
+ *
+ * When the global <f_azi_s> is non-zero, express azimuth as
+ * degrees West of South instread of degrees East of North.
  *
  * This function adjusts the equ2hor ZD/AZ values to match SkyViewCafe.
  */
 void correct_zd_az(double* zd, double* az) {
-    *az = normalize(*az - 180.0, 360.0);
+    if (f_azi_s) {
+        *az = normalize(*az - 180.0, 360.0);
+    } else {
+        *az = normalize(*az, 360.0);
+    }
     *zd = 90.0 - *zd;
 }
 
-int main(void) {
+int planets_main(const struct obs *obs) {
 /*
  * The following three values are Earth Orientation (EO) paramters published by IERS.
  * See bull_a.c for more information.
@@ -121,13 +151,6 @@ int main(void) {
 #if !defined(USING_SOLSYSV2)
     short int de_num = 0;
 #endif
-
-    /* Some location in Seattle. REPLACE WITH YOUR LOCATION. */
-    const double latitude = 47.6096694;
-    const double longitude = -122.340412;
-    const double height = 10.0;
-    const double temperature = 15.0;
-    const double pressure = 1026.4;
 
     time_parameters_t timep;
     double zd, az, rar, decr, tmp;
@@ -148,13 +171,14 @@ int main(void) {
 #if defined(USING_SOLSYSV2)
     char ttl[85];
 #endif
+    char dt_str[32];
 
     if ((error = bull_a_init()) != 0) {
         printf("Error %d from bull_a_init.", error);
         return error;
     }
-    make_on_surface(latitude, longitude, height, temperature, pressure, &geo_loc);
-    make_observer_on_surface(latitude, longitude, height, temperature, pressure,
+    make_on_surface(obs->latitude, obs->longitude, obs->height, obs->temperature, obs->pressure, &geo_loc);
+    make_observer_on_surface(obs->latitude, obs->longitude, obs->height, obs->temperature, obs->pressure,
         &obs_loc);
 
     make_cat_entry("DUMMY","xxx", 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &dummy_star);
@@ -165,17 +189,14 @@ int main(void) {
         }
         if ((error = make_object(0, the_planets[index].id, (char*)the_planets[index].name,
                         &dummy_star, &obj[index])) != 0) {
-            printf ("Error %d from make_object (%s)\n", error, the_planets[index].name);
+            printf("Error %d from make_object (%s)\n", error, the_planets[index].name);
             return error;
         }
     }
     if ((error = make_object(2, 0, "Polaris", &polaris_cat, &polaris)) != 0) {
-        printf ("Error %d from make_object (%s)\n", error, polaris_cat.starname);
+        printf("Error %d from make_object (%s)\n", error, polaris_cat.starname);
         return error;
     }
-
-    printf ("PLANETS: display positions from an observer on Earth's surface\n"
-        "--------------------------------------------------------------\n\n");
 
 #if !defined(USING_SOLSYSV2)
     /*
@@ -190,36 +211,40 @@ int main(void) {
             return error;
         }
     } else {
-        printf("JPL ephemeris DE%d open. Start JD = %10.2f  End JD = %10.2f\n\n",
+        printf_if(1, "JPL ephemeris DE%d open. Start JD = %10.2f  End JD = %10.2f\n\n",
             de_num, jd_beg, jd_end);
     }
 #else
     get_eph_title(ttl, sizeof(ttl), "JPLEPH");
 
-    printf ("Using solsys version 2\n%s\n\n", ttl);
+    printf_if(1, "Using solsys version 2\n%s\n\n", ttl);
 #endif
 
-    printf("Observer geodetic location (ITRS = WGS-84):\n"
-            "{ %s, %s, %6.1f } or { %15.10f %15.10f }\n\n",
-           as_dms(zd_str, geo_loc.latitude), as_dms(az_str, geo_loc.longitude),
+    printf_if(1, "Observer geodetic location (ITRS = WGS-84):\n"
+            "{ %s %s %6.1f } or { %15.10f %15.10f }\n\n",
+           as_dms(zd_str, geo_loc.latitude, 1), as_dms(az_str, geo_loc.longitude, 0),
            geo_loc.height, geo_loc.latitude, geo_loc.longitude);
 
-    tmp = get_jd_utc();
-    bull_a_entry_t* ba_ent = bull_a_find(tmp - 2400000.5);
-    if (ba_ent != NULL) {
-        printf("Bulletin A: %d/%02d/%d %8.2f q=%c (%9.6f, %9.6f) %10.7f\n\n",
-                ba_ent->month, ba_ent->day, ba_ent->year, ba_ent->mjd,
-                ba_ent->pm_quality, ba_ent->pm_x, ba_ent->pm_y, ba_ent->ut1_utc);
-        x_pole = ba_ent->pm_x;
-        y_pole = ba_ent->pm_y;
-        ut1_utc = ba_ent->ut1_utc;
+    strftime(dt_str, sizeof(dt_str), "%X %x", &obs->utc);
+    printf_if(0, "%*sObserved at %s UTC\n", 85 - 16 - strlen(dt_str), "", dt_str);
+    tmp = time_to_jd(&obs->utc);
+    if (f_bull_a) {
+        bull_a_entry_t* ba_ent = bull_a_find(tmp - 2400000.5);
+        if (ba_ent != NULL) {
+            printf_if(1, "Bulletin A: %d/%02d/%d %8.2f q=%c (%9.6f, %9.6f) %10.7f\n\n",
+                    ba_ent->month, ba_ent->day, ba_ent->year, ba_ent->mjd,
+                    ba_ent->pm_quality, ba_ent->pm_x, ba_ent->pm_y, ba_ent->ut1_utc);
+            x_pole = ba_ent->pm_x;
+            y_pole = ba_ent->pm_y;
+            ut1_utc = ba_ent->ut1_utc;
+        }
     }
     make_time_parameters(&timep, tmp, ut1_utc);
-    printf ("TT=%15.6f UT1=%15.6f delta-T=%16.11f leapsecs=%5.1f\n\n", timep.jd_tt,
-        timep.jd_ut1, timep.delta_t, timep.leapsecs);
+    printf_if(1, "JD=%15.6f TT=%15.6f UT1=%15.6f delta-T=%16.11f leapsecs=%5.1f\n\n",
+            tmp, timep.jd_tt, timep.jd_ut1, timep.delta_t, timep.leapsecs);
     display_rotation(&timep, &geo_loc, accuracy);
 
-    printf("%8s %12s %13s %18s %13s %13s\n", "Object", "RA", "DEC", "DIST", "ZA",
+    printf("%8s %12s %13s  %18s  %13s  %13s\n", "Object", "RA", "DEC", "DIST", "ZA",
             "AZ");
     for (index=0; index < NBR_OF_PLANETS; ++index) {
         if (index == earth_index) {
@@ -237,10 +262,10 @@ int main(void) {
         equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
                 t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
         correct_zd_az(&zd, &az);
-        printf("%8s %s %s %18.12e %s %s\n",
+        printf("%8s %s %s  %18.12e  %s  %s\n",
                obj[index].name, as_hms(ra_str, t_place.ra),
-               as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd),
-               as_dms(az_str, az));
+               as_dms(dec_str, t_place.dec, 2), t_place.dis, as_dms(zd_str, zd, 2),
+               as_dms(az_str, az, 2));
     }
 
     /* Polaris provides a helpful frame of reference for the other numbers, since
@@ -262,10 +287,10 @@ int main(void) {
     }
     t_place.dis = 1.0 / sin (paralx * 1.0e-3 * ASEC2RAD);
 
-    printf("%8s %s %s %18.12e %s %s\n",
+    printf("%8s %s %s  %18.12e  %s  %s\n",
             polaris_cat.starname, as_hms(ra_str, t_place.ra),
-            as_dms(dec_str, t_place.dec), t_place.dis, as_dms(zd_str, zd),
-            as_dms(az_str, az));
+            as_dms(dec_str, t_place.dec, 2), t_place.dis, as_dms(zd_str, zd, 2),
+            as_dms(az_str, az, 2));
 
     /* Calculate Solar transit info. */
     if ((error = transit_coord(&timep, &obj[9], x_pole, y_pole, accuracy, &decr, &rar))
@@ -273,9 +298,9 @@ int main(void) {
         printf("Error %d in transit_coord.", error);
         return error;
     }
-    printf("\nSolar transit: {%15.10f %15.10f}\n", decr, rar);
+    printf_if(1, "\nSolar transit: {%15.10f %15.10f}\n", decr, rar);
     tmp = rar - geo_loc.longitude;
-    printf("Transits observer: %15.10f degrees (%s)\n", tmp,
+    printf_if(1, "Transits observer: %15.10f degrees (%s)\n", tmp,
             as_hms(ra_str, normalize(tmp / 15.0, 24.0)));
 
     /* Calculate Moon phase info. */
@@ -288,7 +313,7 @@ int main(void) {
         printf("WARNING: Moon phase index (%d) is out of bounds.\n", phindex);
         phindex = 0;
     }
-    printf("Moon phase: {%15.10f %15.10f} %s [%+9.5f]\n", phlat, phlon,
+    printf_if(1, "Moon phase: {%15.10f %15.10f} %s [%+9.5f]\n", phlat, phlon,
             moon_phase_names[phindex], (double)(phindex * 45) - normalize(phlon, 360.0));
 
 #if !defined(USING_SOLSYSV2)
@@ -298,4 +323,107 @@ int main(void) {
 
     return 0;
 }
+
+static int parse_double(const char *str, double *val) {
+    char *eptr;
+    *val = strtod(str, &eptr);
+    return *eptr == 0;
+}
+
+static void usage() {
+    printf("Usage:\n\n"
+           "  %s [OPTIONS]\n\n"
+           "Print locations of planets from an Earth observer's perspective.\n\n"
+           "OPTIONS are:\n"
+           "  -l NUMBER\n"
+           "    Observer's latitude in degrees North of the Equator\n"
+           "  -L NUMBER\n"
+           "    Observer's longitude in degrees East of the Prime Meridian\n"
+           "  -H NUMBER\n"
+           "    Observer's height in meters above sea level\n"
+           "  -T NUMBER\n"
+           "    Observer's air temperature in degrees Celcius\n"
+           "  -P NUMBER\n"
+           "    Observer's air pressure in millibars\n"
+           "  -t TIME\n"
+           "    UTC time (24-hour format) as appropriate for the system locale\n"
+           "  -d DATE\n"
+           "    UTC date as appropriate for the system locale\n"
+           "  -A\n"
+           "    Do not use Bulletin A to correct for polar motion (wobble).\n"
+           "  -a\n"
+           "    Express azimuth as \"degrees west of South\", rather than\n"
+           "    \"degrees east of North\".\n"
+           "  -v\n"
+           "    Verbose output\n"
+           "  -h\n"
+           "    This help message\n",
+        our_prog_name);
+}
+
+int main(int argc, char *argv[]) {
+	char* p1 = strrchr(argv[0], '/');
+	strncpy(our_prog_name, (p1 == NULL)? argv[0]: p1 + 1, sizeof(our_prog_name));
+	our_prog_name[sizeof(our_prog_name) - 1] = 0;
+
+    /*
+     * Defaults.
+     * These are set to some location in Seattle. REPLACE WITH YOUR LOCATION.
+     */
+    struct obs obs = {
+        .latitude = 47.6096694,
+        .longitude = -122.340412,
+        .height = 10.0,
+        .temperature = 15.0,
+        .pressure = 1026.4
+    };
+    time_now_utc(&obs.utc);
+
+    for (;;) {
+        int c = getopt(argc, argv, ":l:L:H:T:P:t:d:vaAh");
+        if (c == -1) {
+            break;
+        }
+        switch (c) {
+            case 'l':
+                parse_double(optarg, &obs.latitude);
+                break;
+            case 'L':
+                parse_double(optarg, &obs.longitude);
+                break;
+            case 'H':
+                parse_double(optarg, &obs.height);
+                break;
+            case 'T':
+                parse_double(optarg, &obs.temperature);
+                break;
+            case 'P':
+                parse_double(optarg, &obs.pressure);
+                break;
+            case 't':
+                strptime(optarg, "%X", &obs.utc);
+                break;
+            case 'd':
+                strptime(optarg, "%x", &obs.utc);
+                break;
+            case 'a':
+                f_azi_s = 1;
+                break;
+            case 'A':
+                f_bull_a = 0;
+                break;
+            case 'v':
+                ++g_verbosity;
+                break;
+            default:
+                printf("Unknown option.\n");
+                /* falls through */
+            case 'h':
+                usage();
+                return 1;
+        }
+    }
+    return planets_main(&obs);
+}
+
 /* vim:set ts=4 sts=4 sw=4 cindent expandtab: */

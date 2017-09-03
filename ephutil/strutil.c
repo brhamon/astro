@@ -1,10 +1,24 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <math.h>
 #include "ephutil.h"
 
-char *as_dms(char* buf, double val) {
+int g_verbosity = 0;
+
+void printf_if(int min_ver, const char *format, ...)
+{
+    va_list ap;
+    if (g_verbosity >= min_ver) {
+        va_start(ap, format);
+        vprintf(format, ap);
+        va_end(ap);
+    }
+}
+
+char *as_dms(char* buf, double val, int is_latitude) {
+    static const char *direction[] = { "EW", "NS" };
     int deg, min;
     double tmp;
     int sign = 1;
@@ -22,8 +36,13 @@ char *as_dms(char* buf, double val) {
     val -= tmp;
     min = (int)tmp;
     val *= 60.0;
-    snprintf(dbuf, sizeof(dbuf), "%s%d", sign < 0 ? "-" : "", deg);
-    snprintf(buf, DMS_MAX, "%4sd%02d'%04.1f\"", dbuf, min, val);
+    if (is_latitude < 0 || is_latitude > 1) {
+        snprintf(dbuf, sizeof(dbuf), "%s%d", sign < 0 ? "-" : "", deg);
+        snprintf(buf, 16, "%4s\u00b0%02d'%04.1lf\"", dbuf, min, val);
+    } else {
+        snprintf(buf, 16, "%d\u00b0%02d'%04.1lf\"%c", deg, min, val,
+                direction[is_latitude][sign < 0 ? 1: 0]);
+    }
     return buf;
 }
 

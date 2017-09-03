@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <curl/curl.h>
 #include "bull_a.h"
+#include "ephutil.h"
 
 static const char bull_a_file_name[] = "finals2000A.daily";
 static const char *bull_a_url[] = {
@@ -37,7 +38,7 @@ static size_t write_response(void* ptr, size_t size, size_t nmemb, void* stream)
 
     size *= nmemb;
     if (result->pos + size >= result->sz - 1) {
-        printf("error: too small buffer\n");
+        printf("Error: too small buffer\n");
         return 0;
     }
     memcpy(result->data + result->pos, ptr, size);
@@ -162,7 +163,7 @@ int bull_a_init()
                     }
                     close(fd);
                     if (status == 0) {
-                        printf("Read %9jd bytes from %s\n", offset,
+                        printf_if(1, "Read %9jd bytes from %s\n", offset,
                                 bull_a_file_name);
                     }
                 } else { // open failed
@@ -178,7 +179,7 @@ int bull_a_init()
         }
     }
     if (status != 0) {
-        printf("Fetching a new copy of %s\n", bull_a_file_name);
+        printf_if(1, "Fetching a new copy of %s\n", bull_a_file_name);
         file_buffer = (char*)malloc(BUFFER_SIZE);
         if (file_buffer == NULL) {
             status = -1;
@@ -186,7 +187,7 @@ int bull_a_init()
             url_iter = &bull_a_url[0];
             status = -1;
             while (status != 0 && *url_iter != NULL) {
-                printf("  from %s\n", *url_iter);
+                printf_if(1, "  from %s\n", *url_iter);
                 status = fetch_url(*url_iter, file_buffer, BUFFER_SIZE,
                         &file_size);
                 if (status != 0) {
@@ -194,7 +195,7 @@ int bull_a_init()
                 }
             }
             if (status == 0) {
-                printf("Downloaded %9jd bytes.\n", file_size);
+                printf_if(1, "Downloaded %9jd bytes.\n", file_size);
                 fd = open(bull_a_file_name, O_CREAT|O_WRONLY, 0644);
                 if (fd >= 0) {
                     offset = 0;
@@ -209,7 +210,7 @@ int bull_a_init()
                     }
                     close(fd);
                     if (status == 0) {
-                        printf("Wrote %9jd bytes to %s\n", offset, bull_a_file_name);
+                        printf_if(1, "Wrote %9jd bytes to %s\n", offset, bull_a_file_name);
                     }
                 } else { // There was a problem opening the file.
                     status = -1;
@@ -231,7 +232,7 @@ int bull_a_init()
             }
             ++offset;
         }
-        printf("%9jd lines\n", offset);
+        printf_if(1, "%9jd lines\n", offset);
         nbr_of_entries = 0;
         entries = (bull_a_entry_t*)malloc(offset * sizeof(bull_a_entry_t));
         if (entries == NULL) {
