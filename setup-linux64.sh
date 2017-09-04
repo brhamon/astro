@@ -1,4 +1,4 @@
-#!/bin/bash -x
+#!/bin/bash
 # Run from the astro directory
 get_files() {
 # $1 = touchfile
