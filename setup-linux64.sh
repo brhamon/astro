@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 # Run from the astro directory
 get_files() {
 # $1 = touchfile
@@ -54,8 +54,8 @@ if [[ ! -f .Cdist.is_patched ]]; then
 	pushd Cdist
 	patch -p1 < ../support/novasc3.1-linux64.patch
 	cp ../support/Makefile.Cdist Makefile
-	ln -s ../ephemeris/fortran/JPLEPH
 	ln -s ../ephemeris/fortran/jplsubs.f
+	ln -s ../ephemeris/fortran/fsizer4.c
 	popd
 	touch .Cdist.is_patched
 fi
@@ -67,16 +67,10 @@ if [[ ! -f .ephemeris.fortran.is_patched ]]; then
 	mv testeph_new.f testeph.f
 	patch -p1 < ../../support/fortran.patch
 	cp ../../support/Makefile.fortran Makefile
+	cp ../../support/fsizer4.c .
 	popd
 	touch .ephemeris.fortran.is_patched
 fi
 get_files .ephemeris.ascii.de430 ephemeris/ascii/de430 pub/eph/planets/ascii/de430
-for app_path in planets tropical; do
-	if [[ ! -s ${app_path}/JPLEPH ]]; then
-		pushd ${app_path}
-		ln -s ../ephemeris/fortran/JPLEPH
-		popd
-	fi
-done
 echo "Done"
 # vim:set ts=4 sts=4 sw=4 cindent noexpandtab:

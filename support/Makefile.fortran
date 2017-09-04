@@ -1,15 +1,19 @@
 FC = gcc
+CC = gcc
 BUILD ?= debug
 LDFLAGS = -lm -lgfortran
+CFLAGS = -Wall -Wextra
 
 TARGETS = asc2eph testeph
-SOURCES = asc2eph.f testeph.f jplsubs.f
+SOURCES = asc2eph.f testeph.f jplsubs.f fsizer4.c
 
 ifeq ($(BUILD),debug)
 FFLAGS += -g
+CFLAGS += -g
 else
 ifeq ($(BUILD),release)
 FFLAGS += -O3 -DNDEBUG
+CFLAGS += -O3 -DNDEBUG
 endif
 endif
 
@@ -19,9 +23,11 @@ all: $(TARGETS)
 
 asc2eph: asc2eph.o
 
-testeph: testeph.o jplsubs.o
+testeph: testeph.o jplsubs.o fsizer4.o
 
 test: testeph JPLEPH
+	mkdir -p ~/.astro
+	mv JPLEPH ~/.astro
 	cat ../ascii/de430/testpo.430 | ./testeph
 
 JPLEPH: asc2eph

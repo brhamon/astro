@@ -18,22 +18,19 @@
 #include <novas.h>
 #include <ephutil.h>
 #include <moon.h>
-#include "bull_a.h"
-#include <unistd.h>
-#include <time.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <unistd.h>
+#include "bull_a.h"
 
 static char our_prog_name[64];
+static const char jpleph_name[] = "JPLEPH";
 
 /*
  * Global settings.
  */
 int f_azi_s = 0;
 int f_bull_a = 1;
-static const char obs_file_name[] = "obs.dat";
 
 /*
  * Information for Polaris (HD8890) is taken from the SKY2000 Master Catalog, Version 5.
@@ -111,15 +108,6 @@ short int transit_coord(time_parameters_t* tp, object* obj,
     }
     return error;
 }
-
-struct obs {
-    double latitude;
-    double longitude;
-    double height;
-    double temperature;
-    double pressure;
-    struct tm utc;
-};
 
 /*
  * NASA JPL expresses azimuth as degrees East of North, which is
@@ -219,7 +207,21 @@ int planets_main(const struct obs *obs) {
             de_num, jd_beg, jd_end);
     }
 #else
-    get_eph_title(ttl, sizeof(ttl), "JPLEPH");
+    make_local_path();
+    char workpath[PATH_MAX];
+    int sz = snprintf(workpath, sizeof(workpath), "%s/%s", g_local_path, jpleph_name);
+    if (sz < 0 || (size_t)sz >= sizeof(workpath)) {
+        printf("error: unable to form %s/%s pathname.\n", g_local_path, jpleph_name);
+        exit(1);
+    }
+    struct stat buffer;
+    int status = stat(workpath, &buffer);
+    if (status != 0) {
+        printf("error: unable to locate %s.\n", jpleph_name);
+        exit(1);
+    }
+
+    get_eph_title(ttl, sizeof(ttl), workpath);
 
     printf_if(1, "Using solsys version 2\n%s\n\n", ttl);
 #endif
@@ -375,7 +377,10 @@ int main(int argc, char *argv[]) {
 
     /*
      * Defaults.
-     * These are set to some location in Seattle. REPLACE WITH YOUR LOCATION.
+     * These are set to some location in Seattle.
+     *
+     * To make your normal observation location the default, use:
+     * "./planets -l <lat> -L <long> -H <height> -T <temp> -P <pressure> -s"
      */
     struct obs obs = {
         .latitude = 47.6096694,
@@ -384,31 +389,7 @@ int main(int argc, char *argv[]) {
         .temperature = 15.0,
         .pressure = 1026.4
     };
-    make_local_path();
-    char workpath[PATH_MAX];
-    int sz = snprintf(workpath, sizeof(workpath), "%s/%s", g_local_path, obs_file_name);
-    if (sz < 0 || (size_t)sz >= sizeof(workpath)) {
-        printf("error: unable to form observer pathname.\n");
-        exit(1);
-    }
-    printf_if(2, "Observer pathname: \"%s\"\n", workpath);
-    int fd = open(workpath, O_RDONLY);
-    if (fd < 0) {
-        printf_if(2, "No observer defaults found.\n");
-    } else {
-        ssize_t bytes_read = read(fd, &obs, sizeof(obs));
-        if (bytes_read < 0) {
-            printf_if(1, "warning: observer defaults read error.\n");
-        } else {
-            if ((size_t)bytes_read != sizeof(obs)) {
-                printf_if(1, "warning: observer defaults read %zd bytes (expecting %zu).\n",
-                        bytes_read, sizeof(obs));
-            } else {
-                printf_if(2, "observer defaults loaded.\n");
-            }
-        }
-        close(fd);
-    }
+    load_obs(&obs);
 
     time_now_utc(&obs.utc);
     int f_save_obs = 0;
@@ -461,23 +442,7 @@ int main(int argc, char *argv[]) {
         }
     }
     if (f_save_obs) {
-        fd = open(workpath, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
-        if (fd < 0) {
-            printf("Warning: Cannot save observer defaults.\n");
-        } else {
-            ssize_t bytes_written = write(fd, &obs, sizeof(obs));
-            if (bytes_written < 0) {
-                printf("Warning: observer defaults write error.\n");
-            } else {
-                if ((size_t)bytes_written != sizeof(obs)) {
-                    printf("warning: observer defaults wrote %zd bytes (expecting %zu).\n",
-                            bytes_written, sizeof(obs));
-                } else {
-                    printf_if(1, "info: observer defaults saved.\n");
-                }
-            }
-        }
-        close(fd);
+        save_obs(&obs);
     }
     return planets_main(&obs);
 }

@@ -12,7 +12,7 @@ CKS_OBJECTS = $(CKS_SOURCES:%.c=%.o)
 EX_OBJECTS = $(EX_SOURCES:%.c=%.o)
 
 LIBNAME = novas.a
-SOURCES = novas.c novascon.c nutation.c solsys2.c readeph0.c
+SOURCES = novas.c novascon.c nutation.c solsys2.c readeph0.c fsizer4.c
 FSOURCES = jplint.f jplsubs.f
 FOBJECTS = $(FSOURCES:%.f=%.o)
 OBJECTS = $(SOURCES:%.c=%.o)

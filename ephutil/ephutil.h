@@ -2,6 +2,7 @@
 #define EPHUTIL_H_
 
 #include <limits.h>
+#include <time.h>
 
 /*
 coord_sys:
@@ -89,6 +90,18 @@ typedef struct {
     real_point ub;
 } real_range_point;
 
+/*
+ * obs -- observation parameters convenience structure
+ */
+struct obs {
+    double latitude;
+    double longitude;
+    double height;
+    double temperature;
+    double pressure;
+    struct tm utc;
+};
+
 static inline int is_neg(double a) {
     return a < 0.0;
 }
@@ -139,6 +152,8 @@ extern double normalize(double val, double period);
 extern double leapsec_tai_utc(double jd_utc);
 extern void printf_if(int min_ver, const char *format, ...);
 extern void make_local_path();
+extern void load_obs(struct obs *obs);
+extern void save_obs(const struct obs *obs);
 
 /*
  * bracket_roots -- Divide <in_range> into <intervals>, then look for sign

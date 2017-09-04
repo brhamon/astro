@@ -4,7 +4,7 @@ BEGIN {
 {
 	if ($0 ~ /^[ ]{6}SUBROUTINE FSIZER1\>/) {
 		outfile="/dev/null"
-	} else if ($0 ~ /^[ ]{6}SUBROUTINE FSIZER3\>/) {
+	} else if ($0 ~ /^[ ]{6}SUBROUTINE PLEPH\>/) {
 		outfile="jplsubs.f"
 	}
 	print > outfile
