@@ -1,5 +1,5 @@
-FC = gcc
-CC = gcc
+FC = gfortran
+CC = gfortran
 BUILD ?= debug
 LDFLAGS = -lm -lgfortran
 CFLAGS = -Wall -Wextra

@@ -211,11 +211,11 @@ binary ephemeris should match identically the ephemeris you just built
 on 64-bit Linux systems. To confirm, run the following command:
 
 ```
-$ sha256sum ~/.astro/JPLEPH
-0deb23ca9269496fcbab9f84bec9f3f090e263bfb99c62428b212790721de126  ~/.astro/JPLEPH
+$ cat ~/.astro/JPLEPH | openssl dgst -hex -sha256
+(stdin)= 0deb23ca9269496fcbab9f84bec9f3f090e263bfb99c62428b212790721de126
 ```
 
-The value above matches exactly the sha256sum of the file `linux_p1550p2650.430`
+The value above matches exactly the SHA256 digest of the file `linux_p1550p2650.430`
 dated 2013-Aug-15 from the JPL FTP site. Even though this file is available,
 building your own binary ephemeris is worth the effort
 because it validates the FORTRAN back-end, which is used both for
@@ -232,6 +232,12 @@ for amateur astronomy, therefore a patch to replace the back end
 with native C would definitely be in scope. Such an effort would
 also open up the project to developers running Microsoft Visual
 Studio.
+
+## Mac (Darwin) support
+
+This project has been tested on MacOS, after installing gcc and gfortran.
+More information about obtaining the binaries is available at
+https://gcc.gnu.org/wiki/GFortranBinaries
 
 ## What about Microsoft Windows?
 

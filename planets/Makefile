@@ -1,4 +1,5 @@
-CC = gcc
+FC = gfortran
+CC = gfortran
 BUILD ?= debug
 
 NOVAS = novas.a

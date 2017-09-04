@@ -42,7 +42,7 @@ get_files() {
 	fi
 }
 
-declare MY_CURLOPTS="--connect-timeout 60"
+declare MY_CURLOPTS="--connect-timeout 20 --no-keepalive"
 if [[ ! -f .Cdist.is_patched ]]; then
 	if [[ -d Cdist ]]; then
 		rm -fr Cdist
@@ -62,10 +62,12 @@ fi
 get_files .ephemeris.fortran ephemeris/fortran pub/eph/planets/fortran
 if [[ ! -f .ephemeris.fortran.is_patched ]]; then
 	pushd ephemeris/fortran
-	gawk -f ../../support/jplsubs.awk testeph.f
-	mv testeph.f testeph_orig.f
-	mv testeph_new.f testeph.f
-	patch -p1 < ../../support/fortran.patch
+	if [[ ! -f testeph_orig.f ]]; then
+		cp testeph.f testeph_orig.f
+		sed -e '/^[ \t]\{1,\}SUBROUTINE PLEPH/,$!d' testeph_orig.f > jplsubs.f
+		sed -e '/^[ \t]\{1,\}SUBROUTINE FSIZER1/,$d' testeph_orig.f > testeph.f
+		patch -p1 < ../../support/fortran.patch
+	fi
 	cp ../../support/Makefile.fortran Makefile
 	cp ../../support/fsizer4.c .
 	popd
