@@ -102,10 +102,16 @@ it again (sometimes repeatedly) after it stops on an FTP error.
 `make -C ephemeris/fortran test`
 
 The output will display (among other things) the _jpl values_, _user value_ and _difference_.
+The output may end with:
 
-A successful run will have no difference greater than about `0.71054E-14`
+`Note: The following floating-point exceptions are signalling: IEEE_UNDERFLOW_FLAG IEEE_DENORMAL`
 
-You now have the binary ephemeris for your platform.
+The exit code is normal, so this message can (probably) be ignored for now. What is important
+are the numbers in the "difference" column.  A successful run will have no difference greater
+than about `0.71054E-14`
+
+The output, `JPLEPH` is created in `ephemeris/fortran`, but after passing the test is moved
+to ~/.astro. You now have the binary ephemeris for your platform.
 
 ### Build NOVAS-C examples
 
@@ -205,8 +211,8 @@ binary ephemeris should match identically the ephemeris you just built
 on 64-bit Linux systems. To confirm, run the following command:
 
 ```
-$ sha256sum ephemeris/fortran/JPLEPH
-0deb23ca9269496fcbab9f84bec9f3f090e263bfb99c62428b212790721de126  ephemeris/fortran/JPLEPH
+$ sha256sum ~/.astro/JPLEPH
+0deb23ca9269496fcbab9f84bec9f3f090e263bfb99c62428b212790721de126  ~/.astro/JPLEPH
 ```
 
 The value above matches exactly the sha256sum of the file `linux_p1550p2650.430`
@@ -259,10 +265,9 @@ Temperature is expressed in degrees Celsius. Pressure is expressed
 in millibars.
 
 ```
-cd ../planets
-make
-./planets -h
-watch ./planets
+make -C planets
+planets/planets -h
+watch planets/planets
 ```
 
 ## Tropical
@@ -273,6 +278,36 @@ The `tropical` program displays upcoming tropical moments
 It uses the latitude of the subsolar point on Earth in its
 calculations. A local maximum or minimum latitude is the
 solstice, and the crossing of the Equator is the equinox.
+
+```
+make -C tropical
+tropical/tropical
+```
+
+The output will look like:
+```
+Using solsys version 2
+
+
+September equinox occurs at 2017-09-22 20:05:42 UTC
+  Subsolar point: {0°00'03.3"S 123°17'42.7"W} [{-0.0009103414, -123.2951996969}]
+December solstice occurs at 2017-12-21 06:08:38 UTC
+  Subsolar point: {23°26'02.3"S 87°21'18.5"E} [{-23.4339762762, 87.3551439222}]
+March equinox occurs at 2018-03-20 16:11:34 UTC
+  Subsolar point: {0°00'04.7"S 61°02'23.2"W} [{-0.0013095105, -61.0397648868}]
+June solstice occurs at 2018-06-21 21:01:06 UTC
+  Subsolar point: {23°26'04.4"N 134°48'40.7"W} [{23.4345547085, -134.8112933746}]
+September equinox occurs at 2018-09-23 01:50:38 UTC
+  Subsolar point: {0°00'03.3"N 150°28'05.7"E} [{0.0009268029, 150.4682396496}]
+December solstice occurs at 2018-12-21 12:30:43 UTC
+  Subsolar point: {23°26'05.3"S 8°09'55.8"W} [{-23.4348010124, -8.1655028688}]
+March equinox occurs at 2019-03-20 22:00:34 UTC
+  Subsolar point: {0°00'02.7"N 148°16'59.2"W} [{0.0007503193, -148.2831158729}]
+June solstice occurs at 2019-06-22 02:55:10 UTC
+  Subsolar point: {23°26'05.9"N 136°40'28.8"E} [{23.4349703858, 136.6746679012}]
+September equinox occurs at 2019-09-23 07:49:46 UTC
+  Subsolar point: {0°00'00.3"N 60°40'44.7"E} [{0.0000735089, 60.6790762663}]
+```
 
 # Citation and Further Reading
 
