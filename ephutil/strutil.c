@@ -99,4 +99,9 @@ double get_double(const char* cp, size_t len) {
     return val;
 }
 
+int parse_double(const char *str, double *val) {
+    char *eptr;
+    *val = strtod(str, &eptr);
+    return *eptr == 0;
+}
 

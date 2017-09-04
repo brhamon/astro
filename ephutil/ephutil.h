@@ -2,7 +2,7 @@
 #define EPHUTIL_H_
 
 #include <limits.h>
-#include <time.h>
+#include <novas.h>
 
 /*
 coord_sys:
@@ -93,15 +93,6 @@ typedef struct {
 /*
  * obs -- observation parameters convenience structure
  */
-struct obs {
-    double latitude;
-    double longitude;
-    double height;
-    double temperature;
-    double pressure;
-    struct tm utc;
-};
-
 static inline int is_neg(double a) {
     return a < 0.0;
 }
@@ -127,6 +118,7 @@ extern char *as_dms(char* buf, double val, int is_latitude);
 extern char *as_hms(char* buf, double val);
 
 extern void get_rtrim(char* out, size_t max_out, const char* in_beg, const char* in_end);
+extern int parse_double(const char *str, double *val);
 
 #define NBR_OF_PLANETS 11
 extern const planet_t the_planets[NBR_OF_PLANETS];
@@ -152,8 +144,8 @@ extern double normalize(double val, double period);
 extern double leapsec_tai_utc(double jd_utc);
 extern void printf_if(int min_ver, const char *format, ...);
 extern void make_local_path();
-extern void load_obs(struct obs *obs);
-extern void save_obs(const struct obs *obs);
+extern void load_obs(on_surface *obs);
+extern void save_obs(const on_surface *obs);
 
 /*
  * bracket_roots -- Divide <in_range> into <intervals>, then look for sign

@@ -5,10 +5,11 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <novas.h>
 
 static const char obs_file_name[] = "obs.dat";
 
-void load_obs(struct obs *obs)
+void load_obs(on_surface *obs)
 {
     make_local_path();
     char workpath[PATH_MAX];
@@ -22,13 +23,13 @@ void load_obs(struct obs *obs)
     if (fd < 0) {
         printf_if(2, "No observer defaults found.\n");
     } else {
-        ssize_t bytes_read = read(fd, obs, sizeof(struct obs));
+        ssize_t bytes_read = read(fd, obs, sizeof(on_surface));
         if (bytes_read < 0) {
             printf_if(1, "warning: observer defaults read error.\n");
         } else {
-            if ((size_t)bytes_read != sizeof(struct obs)) {
+            if ((size_t)bytes_read != sizeof(on_surface)) {
                 printf_if(1, "warning: observer defaults read %zd bytes (expecting %zu).\n",
-                        bytes_read, sizeof(struct obs));
+                        bytes_read, sizeof(on_surface));
             } else {
                 printf_if(2, "observer defaults loaded.\n");
             }
@@ -37,7 +38,7 @@ void load_obs(struct obs *obs)
     }
 }
 
-void save_obs(const struct obs *obs)
+void save_obs(const on_surface *obs)
 {
     char workpath[PATH_MAX];
     int sz = snprintf(workpath, sizeof(workpath), "%s/%s", g_local_path, obs_file_name);
@@ -50,13 +51,13 @@ void save_obs(const struct obs *obs)
     if (fd < 0) {
         printf("Warning: Cannot save observer defaults.\n");
     } else {
-        ssize_t bytes_written = write(fd, obs, sizeof(struct obs));
+        ssize_t bytes_written = write(fd, obs, sizeof(on_surface));
         if (bytes_written < 0) {
             printf("Warning: observer defaults write error.\n");
         } else {
-            if ((size_t)bytes_written != sizeof(struct obs)) {
+            if ((size_t)bytes_written != sizeof(on_surface)) {
                 printf("warning: observer defaults wrote %zd bytes (expecting %zu).\n",
-                        bytes_written, sizeof(struct obs));
+                        bytes_written, sizeof(on_surface));
             } else {
                 printf_if(1, "info: observer defaults saved.\n");
             }

@@ -126,7 +126,6 @@ static double get_double(char* p, size_t len) {
 void make_local_path()
 {
     if (*g_local_path != 0) {
-        printf_if(2, "info: local_path already assigned: \"%s\".\n", g_local_path);
         return;
     }
     struct stat buffer;

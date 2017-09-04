@@ -9,12 +9,8 @@
  *  http://aa.usno.navy.mil/software/novas/novas_info.php
  */
 
-#define USING_SOLSYSV2
 #define _XOPEN_SOURCE
 
-#if !defined(USING_SOLSYSV2)
-#include "eph_manager.h"
-#endif
 #include <novas.h>
 #include <ephutil.h>
 #include <moon.h>
@@ -22,6 +18,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include "bull_a.h"
+#include <time.h>
 
 static char our_prog_name[64];
 static const char jpleph_name[] = "JPLEPH";
@@ -51,61 +48,63 @@ static cat_entry polaris_cat = {"POLARIS", "SKI", 2480053, 2.5303010278, 89.2641
  *
  * These values help explain the instantaneous transalation between ICRS and ITRS.
  */
-short int display_rotation(time_parameters_t* tp, on_surface* lp, short int accuracy) {
-    short int error;
-    double last, gast, theta;
-    if ((error = sidereal_time(tp->jd_ut1, 0.0, tp->delta_t, 1, 1, accuracy, &gast))
-            != 0) {
-        printf("Error %d from sidereal_time.", error);
-        return error;
+short int display_rotation(time_parameters_t *tp, on_surface *lp, short int accuracy)
+{
+    double gast;
+    short int error = sidereal_time(tp->jd_ut1, 0.0, tp->delta_t, 1, 1, accuracy, &gast);
+    if (error != 0) {
+        printf_if(3, "ERRCODE %d from sidereal_time.", error);
+        goto out;
     }
 
-    last = gast + lp->longitude / 15.0;
+    double last = gast + lp->longitude / 15.0;
     if (last >= 24.0) {
         last -= 24.0;
     } else if (last < 0.0) {
         last += 24.0;
     }
 
-    theta = era(tp->jd_ut1, 0.0);
+    double theta = era(tp->jd_ut1, 0.0);
 
     printf_if(1, "Sidereal time: Greenwich=%16.11f, local=%16.11f\n", gast, last);
     printf_if(1, "ERA %15.10f\n\n", theta);
-    return 0;
+out:
+    return error;
 }
 
 /*
  * Calculate the 'Transit coordinates' for a solar system object.
  * This is the location on Earth at which the object is at local zenith.
  */
-short int transit_coord(time_parameters_t* tp, object* obj,
+short int transit_coord(time_parameters_t *tp, object *obj,
         double x_pole, double y_pole,
         short int accuracy,
-        double* lat, double* lon)
+        double *lat, double *lon)
 {
-    short int error = 0;
     observer geo_ctr;
     sky_pos t_place;
     double pose[3];
     double pos[3];
 
-    make_observer(0, NULL, NULL, &geo_ctr);
-    if ((error = place(tp->jd_tt, obj, &geo_ctr, tp->delta_t,
-                    coord_equ, accuracy, &t_place)) != 0) {
-        printf("Error %d from place.", error);
-    } else {
-        radec2vector(t_place.ra, t_place.dec, t_place.dis, pose);
-        if ((error = cel2ter(tp->jd_ut1, 0.0, tp->delta_t, coord_equ, accuracy,
-                        coord_equ, x_pole, y_pole, pose, pos)) != 0) {
-            printf("Error %d from cel2ter.", error);
-        } else {
-            vector2radec(pos, lon, lat);
-            *lon *= 15.0;
-            if (*lon > 180.0) {
-                *lon -= 360.0;
-            }
-        }
+    make_observer_at_geocenter(&geo_ctr);
+    short int error = place(tp->jd_tt, obj, &geo_ctr, tp->delta_t, coord_equ, accuracy, &t_place);
+    if (error != 0) {
+        printf_if(3, "ERRCODE %d from place.", error);
+        goto out;
     }
+    radec2vector(t_place.ra, t_place.dec, t_place.dis, pose);
+    error = cel2ter(tp->jd_ut1, 0.0, tp->delta_t, coord_equ, accuracy,
+                    coord_equ, x_pole, y_pole, pose, pos);
+    if (error != 0) {
+        printf_if(3, "ERRCODE %d from cel2ter.", error);
+        goto out;
+    }
+    vector2radec(pos, lon, lat);
+    *lon *= 15.0;
+    if (*lon > 180.0) {
+        *lon -= 360.0;
+    }
+out:
     return error;
 }
 
@@ -120,7 +119,7 @@ short int transit_coord(time_parameters_t* tp, object* obj,
  *
  * This function adjusts the equ2hor ZD/AZ values to match SkyViewCafe.
  */
-void correct_zd_az(double* zd, double* az) {
+void correct_zd_az(double *zd, double *az) {
     if (f_azi_s) {
         *az = normalize(*az - 180.0, 360.0);
     } else {
@@ -129,7 +128,7 @@ void correct_zd_az(double* zd, double* az) {
     *zd = 90.0 - *zd;
 }
 
-int planets_main(const struct obs *obs) {
+int planets_main(const on_surface *obs, struct tm *utc) {
 /*
  * The following three values are Earth Orientation (EO) paramters published by IERS.
  * See bull_a.c for more information.
@@ -139,10 +138,6 @@ int planets_main(const struct obs *obs) {
     double ut1_utc = 0.0;
 
     const short int accuracy = 0;
-    short int error = 0;
-#if !defined(USING_SOLSYSV2)
-    short int de_num = 0;
-#endif
 
     time_parameters_t timep;
     double zd, az, rar, decr, tmp;
@@ -160,18 +155,18 @@ int planets_main(const struct obs *obs) {
     char zd_str[DMS_MAX];
     char ra_str[HMS_MAX];
     char az_str[DMS_MAX];
-#if defined(USING_SOLSYSV2)
     char ttl[85];
-#endif
     char dt_str[32];
 
-    if ((error = bull_a_init()) != 0) {
+    short int error = bull_a_init();
+    if (error != 0) {
         printf("Error %d from bull_a_init.", error);
-        return error;
+        goto out2;
     }
-    make_on_surface(obs->latitude, obs->longitude, obs->height, obs->temperature, obs->pressure, &geo_loc);
-    make_observer_on_surface(obs->latitude, obs->longitude, obs->height, obs->temperature, obs->pressure,
-        &obs_loc);
+    make_on_surface(obs->latitude, obs->longitude, obs->height, obs->temperature,
+            obs->pressure, &geo_loc);
+    make_observer_on_surface(obs->latitude, obs->longitude, obs->height, obs->temperature,
+            obs->pressure, &obs_loc);
 
     make_cat_entry("DUMMY","xxx", 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &dummy_star);
 
@@ -179,34 +174,19 @@ int planets_main(const struct obs *obs) {
         if (the_planets[index].id == 3) {
             earth_index = index;
         }
-        if ((error = make_object(0, the_planets[index].id, (char*)the_planets[index].name,
-                        &dummy_star, &obj[index])) != 0) {
-            printf("Error %d from make_object (%s)\n", error, the_planets[index].name);
-            return error;
+        error = make_object(0, the_planets[index].id, (char *)the_planets[index].name,
+                        &dummy_star, &obj[index]);
+        if (error != 0 ) {
+            printf_if(3, "ERRCODE %d from make_object (%s)\n", error, the_planets[index].name);
+            goto out;
         }
     }
-    if ((error = make_object(2, 0, "Polaris", &polaris_cat, &polaris)) != 0) {
-        printf("Error %d from make_object (%s)\n", error, polaris_cat.starname);
-        return error;
+    error = make_object(2, 0, "Polaris", &polaris_cat, &polaris);
+    if (error != 0) {
+        printf_if(3, "ERRCODE %d from make_object (%s)\n", error, polaris_cat.starname);
+        goto out;
     }
 
-#if !defined(USING_SOLSYSV2)
-    /*
-     * Open the JPL binary ephemeris file, here named "JPLEPH".
-     */
-
-    if ((error = ephem_open("JPLEPH", &jd_beg, &jd_end, &de_num)) != 0) {
-        if (error == 1) {
-            printf("JPL ephemeris file not found.\n");
-        } else {
-            printf("Error reading JPL ephemeris file header.\n");
-            return error;
-        }
-    } else {
-        printf_if(1, "JPL ephemeris DE%d open. Start JD = %10.2f  End JD = %10.2f\n\n",
-            de_num, jd_beg, jd_end);
-    }
-#else
     make_local_path();
     char workpath[PATH_MAX];
     int sz = snprintf(workpath, sizeof(workpath), "%s/%s", g_local_path, jpleph_name);
@@ -223,19 +203,16 @@ int planets_main(const struct obs *obs) {
 
     get_eph_title(ttl, sizeof(ttl), workpath);
 
-    printf_if(1, "Using solsys version 2\n%s\n\n", ttl);
-#endif
-
     printf_if(1, "Observer geodetic location (ITRS = WGS-84):\n"
             "{ %s %s %6.1f } or { %15.10f %15.10f }\n\n",
            as_dms(zd_str, geo_loc.latitude, 1), as_dms(az_str, geo_loc.longitude, 0),
            geo_loc.height, geo_loc.latitude, geo_loc.longitude);
 
-    strftime(dt_str, sizeof(dt_str), "%X %x", &obs->utc);
+    strftime(dt_str, sizeof(dt_str), "%X %x", utc);
     printf_if(0, "%*sObserved at %s UTC\n", 85 - 16 - strlen(dt_str), "", dt_str);
-    tmp = time_to_jd(&obs->utc);
+    tmp = time_to_jd(utc);
     if (f_bull_a) {
-        bull_a_entry_t* ba_ent = bull_a_find(tmp - 2400000.5);
+        bull_a_entry_t *ba_ent = bull_a_find(tmp - 2400000.5);
         if (ba_ent != NULL) {
             printf_if(1, "Bulletin A: %d/%02d/%d %8.2f q=%c (%9.6f, %9.6f) %10.7f\n\n",
                     ba_ent->month, ba_ent->day, ba_ent->year, ba_ent->mjd,
@@ -256,10 +233,11 @@ int planets_main(const struct obs *obs) {
         if (index == earth_index) {
             continue; // skip Earth
         }
-        if ((error = place(timep.jd_tt, &obj[index], &obs_loc, timep.delta_t, coord_equ,
-                        accuracy, &t_place)) != 0) {
-            printf("Error %d from place.", error);
-            return error;
+        error = place(timep.jd_tt, &obj[index], &obs_loc, timep.delta_t, coord_equ,
+                        accuracy, &t_place);
+        if (error != 0) {
+            printf_if(3, "ERRCODE %d from place.", error);
+            goto out;
         }
 
         /*
@@ -277,10 +255,11 @@ int planets_main(const struct obs *obs) {
     /* Polaris provides a helpful frame of reference for the other numbers, since
      * it's always very close to the CIP.
      */
-    if ((error = place(timep.jd_tt, &polaris, &obs_loc, timep.delta_t, coord_equ,
-                    accuracy, &t_place)) != 0) {
-        printf("Error %d from place.", error);
-        return error;
+    error = place(timep.jd_tt, &polaris, &obs_loc, timep.delta_t, coord_equ,
+                    accuracy, &t_place);
+    if (error != 0) {
+        printf_if(3, "ERRCODE %d from place.", error);
+        goto out;
     }
     equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
             t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
@@ -299,10 +278,10 @@ int planets_main(const struct obs *obs) {
             as_dms(az_str, az, 2));
 
     /* Calculate Solar transit info. */
-    if ((error = transit_coord(&timep, &obj[9], x_pole, y_pole, accuracy, &decr, &rar))
-            != 0) {
-        printf("Error %d in transit_coord.", error);
-        return error;
+    error = transit_coord(&timep, &obj[9], x_pole, y_pole, accuracy, &decr, &rar);
+    if (error != 0) {
+        printf_if(3, "ERRCODE %d in transit_coord.", error);
+        goto out;
     }
     printf_if(1, "\nSolar transit: {%15.10f %15.10f}\n", decr, rar);
     tmp = rar - geo_loc.longitude;
@@ -312,8 +291,8 @@ int planets_main(const struct obs *obs) {
     /* Calculate Moon phase info. */
     error = moon_phase(&timep, &obj[9], &obj[10], accuracy, &phlat, &phlon, &phindex);
     if (error != 0) {
-        printf("Error %d from moon_phase.", error);
-        return error;
+        printf_if(3, "ERRCODE %d from moon_phase.", error);
+        goto out;
     }
     if (phindex < 0 || phindex > 7) {
         printf("WARNING: Moon phase index (%d) is out of bounds.\n", phindex);
@@ -322,18 +301,10 @@ int planets_main(const struct obs *obs) {
     printf_if(1, "Moon phase: {%15.10f %15.10f} %s [%+9.5f]\n", phlat, phlon,
             moon_phase_names[phindex], (double)(phindex * 45) - normalize(phlon, 360.0));
 
-#if !defined(USING_SOLSYSV2)
-    ephem_close();  /* remove this line for use with solsys version 2 */
-#endif
+out:
     bull_a_cleanup();
-
-    return 0;
-}
-
-static int parse_double(const char *str, double *val) {
-    char *eptr;
-    *val = strtod(str, &eptr);
-    return *eptr == 0;
+out2:
+    return error;
 }
 
 static void usage() {
@@ -382,7 +353,7 @@ int main(int argc, char *argv[]) {
      * To make your normal observation location the default, use:
      * "./planets -l <lat> -L <long> -H <height> -T <temp> -P <pressure> -s"
      */
-    struct obs obs = {
+    on_surface obs = {
         .latitude = 47.6096694,
         .longitude = -122.340412,
         .height = 10.0,
@@ -391,7 +362,8 @@ int main(int argc, char *argv[]) {
     };
     load_obs(&obs);
 
-    time_now_utc(&obs.utc);
+    struct tm utc;
+    time_now_utc(&utc);
     int f_save_obs = 0;
 
     for (;;) {
@@ -416,10 +388,10 @@ int main(int argc, char *argv[]) {
                 parse_double(optarg, &obs.pressure);
                 break;
             case 't':
-                strptime(optarg, "%X", &obs.utc);
+                strptime(optarg, "%X", &utc);
                 break;
             case 'd':
-                strptime(optarg, "%x", &obs.utc);
+                strptime(optarg, "%x", &utc);
                 break;
             case 'a':
                 f_azi_s = 1;
@@ -444,7 +416,7 @@ int main(int argc, char *argv[]) {
     if (f_save_obs) {
         save_obs(&obs);
     }
-    return planets_main(&obs);
+    return planets_main(&obs, &utc);
 }
 
 /* vim:set ts=4 sts=4 sw=4 cindent expandtab: */
