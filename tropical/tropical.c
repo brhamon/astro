@@ -17,10 +17,13 @@
 #include <ephutil.h>
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include "bull_a.h"
+#include <jpleph.h>
 
 static object sol;
 static short int accuracy;
+static const char jpleph_name[] = "JPLEPH";
 
 /*
  * Calculate the geodesic coordinates of the subsolar point. (Or the
@@ -213,19 +216,40 @@ void list_next_moments(int years)
     }
 }
 
+static void get_ephfilename(char *workpath, size_t workpath_len, int f_check_file) {
+    make_local_path();
+    int sz = snprintf(workpath, workpath_len, "%s/%s", g_local_path, jpleph_name);
+    if (sz < 0 || (size_t)sz >= workpath_len) {
+        printf("error: unable to form %s/%s pathname.\n", g_local_path, jpleph_name);
+        exit(1);
+    }
+    if (f_check_file != 0) {
+        struct stat buffer;
+        int status = stat(workpath, &buffer);
+        if (status != 0) {
+            printf("error: unable to locate %s.\n", jpleph_name);
+            exit(1);
+        }
+    }
+}
+
 int main(void) {
     cat_entry dummy_star;
     short int error = 0;
     char ttl[85];
+
+    char workpath[PATH_MAX];
+    get_ephfilename(workpath, sizeof(workpath), 1);
+    g_ephfile_name = workpath;
 
     accuracy = 0;
     if ((error = bull_a_init()) != 0) {
         printf("Error %d from bull_a_init.", error);
         return error;
     }
-    get_eph_title(ttl, sizeof(ttl), "JPLEPH");
+    get_eph_title(ttl, sizeof(ttl), workpath);
 
-    printf ("Using solsys version 2\n%s\n\n", ttl);
+    printf("Ephemeris: %s\n", ttl);
 
     make_cat_entry("DUMMY","xxx", 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &dummy_star);
 
@@ -237,7 +261,7 @@ int main(void) {
 
     list_next_moments(2);
     bull_a_cleanup();
-
+    finalize_jpleph();
     return 0;
 }
 /* vim:set ts=4 sts=4 sw=4 cindent expandtab: */

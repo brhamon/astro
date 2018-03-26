@@ -19,6 +19,7 @@
 #include <unistd.h>
 #include "bull_a.h"
 #include <time.h>
+#include <jpleph.h>
 
 static char our_prog_name[64];
 static const char jpleph_name[] = "JPLEPH";
@@ -128,6 +129,23 @@ void correct_zd_az(double *zd, double *az) {
     *zd = 90.0 - *zd;
 }
 
+static void get_ephfilename(char *workpath, size_t workpath_len, int f_check_file) {
+    make_local_path();
+    int sz = snprintf(workpath, workpath_len, "%s/%s", g_local_path, jpleph_name);
+    if (sz < 0 || (size_t)sz >= workpath_len) {
+        printf("error: unable to form %s/%s pathname.\n", g_local_path, jpleph_name);
+        exit(1);
+    }
+    if (f_check_file != 0) {
+        struct stat buffer;
+        int status = stat(workpath, &buffer);
+        if (status != 0) {
+            printf("error: unable to locate %s.\n", jpleph_name);
+            exit(1);
+        }
+    }
+}
+
 int planets_main(const on_surface *obs, struct tm *utc) {
 /*
  * The following three values are Earth Orientation (EO) paramters published by IERS.
@@ -187,21 +205,10 @@ int planets_main(const on_surface *obs, struct tm *utc) {
         goto out;
     }
 
-    make_local_path();
     char workpath[PATH_MAX];
-    int sz = snprintf(workpath, sizeof(workpath), "%s/%s", g_local_path, jpleph_name);
-    if (sz < 0 || (size_t)sz >= sizeof(workpath)) {
-        printf("error: unable to form %s/%s pathname.\n", g_local_path, jpleph_name);
-        exit(1);
-    }
-    struct stat buffer;
-    int status = stat(workpath, &buffer);
-    if (status != 0) {
-        printf("error: unable to locate %s.\n", jpleph_name);
-        exit(1);
-    }
-
+    get_ephfilename(workpath, sizeof(workpath), 0);
     get_eph_title(ttl, sizeof(ttl), workpath);
+    printf_if(1, "Ephemeris: %s\n", ttl);
 
     printf_if(1, "Observer geodetic location (ITRS = WGS-84):\n"
             "{ %s %s %6.1f } or { %15.10f %15.10f }\n\n",
@@ -416,7 +423,13 @@ int main(int argc, char *argv[]) {
     if (f_save_obs) {
         save_obs(&obs);
     }
-    return planets_main(&obs, &utc);
+
+    char workpath[PATH_MAX];
+    get_ephfilename(workpath, sizeof(workpath), 1);
+    g_ephfile_name = workpath;
+    int res = planets_main(&obs, &utc);
+    finalize_jpleph();
+    return res;
 }
 
 /* vim:set ts=4 sts=4 sw=4 cindent expandtab: */

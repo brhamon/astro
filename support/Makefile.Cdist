@@ -1,8 +1,7 @@
-CC = gfortran
-FC = gfortran
+CC = gcc
 BUILD ?= debug
-CFLAGS = -Wall -Wextra
-LDFLAGS = -lm -lgfortran
+CFLAGS = -Wall -Werror -Wextra
+LDFLAGS = -lm
 
 TARGETS = checkout-stars example
 CKS_SOURCES = checkout-stars.c
@@ -12,12 +11,10 @@ CKS_OBJECTS = $(CKS_SOURCES:%.c=%.o)
 EX_OBJECTS = $(EX_SOURCES:%.c=%.o)
 
 LIBNAME = novas.a
-SOURCES = novas.c novascon.c nutation.c solsys2.c readeph0.c fsizer4.c
-FSOURCES = jplint.f jplsubs.f
-FOBJECTS = $(FSOURCES:%.f=%.o)
+SOURCES = novas.c novascon.c nutation.c solsys2.c readeph0.c jpleph.c jplint.c
 OBJECTS = $(SOURCES:%.c=%.o)
 
-# ar r $(LIBNAME) $(OBJECTS) $(FOBJECTS)
+# ar r $(LIBNAME) $(OBJECTS)
 
 ifeq ($(BUILD),debug)
 CFLAGS += -g
@@ -37,12 +34,13 @@ checkout-stars: $(CKS_OBJECTS) $(LIBNAME)
 
 example: $(EX_OBJECTS) $(LIBNAME)
 
-$(LIBNAME): $(OBJECTS) $(FOBJECTS)
-	ar r $(LIBNAME) $(OBJECTS) $(FOBJECTS)
+$(LIBNAME): $(OBJECTS)
+	ar r $(LIBNAME) $(OBJECTS)
 
 clean:
-	@rm -f $(TARGET) $(CKS_OBJECTS) $(EX_OBJECTS) \
-		$(LIBNAME) $(OBJECTS) $(FOBJECTS) $(SOURCES:%c=%.d)
+	@rm -f $(TARGETS) $(CKS_OBJECTS) $(EX_OBJECTS) \
+		$(LIBNAME) $(OBJECTS) $(SOURCES:%.c=%.d) \
+		$(CKS_SOURCES:%.c=%.d) $(EX_SOURCES:%.c=%.d)
 
 ### Dependencies ###
 

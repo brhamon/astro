@@ -1,5 +1,4 @@
-FC = gfortran
-CC = gfortran
+CC = gcc
 BUILD ?= debug
 
 NOVAS = novas.a
@@ -10,7 +9,7 @@ EPHUTPATH = ../ephutil
 EPHUTLIB = $(EPHUTPATH)/$(EPHUT)
 
 CFLAGS = -Wall -Wextra -I $(NOVASPATH) -I $(EPHUTPATH)
-LDFLAGS = -lm -lgfortran -lcurl
+LDFLAGS = -lm -lcurl
 
 TARGET = tropical
 SOURCES = tropical.c

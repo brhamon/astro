@@ -64,27 +64,6 @@ diff -rbU3 Cdist.orig/example.c Cdist/example.c
 -      
     return (0);
  }
-diff -rbU3 Cdist.orig/jplint.f Cdist/jplint.f
---- Cdist.orig/jplint.f	2011-01-21 14:48:10.000000000 +0000
-+++ Cdist/jplint.f	2015-12-31 00:54:59.000000000 +0000
-@@ -72,7 +72,7 @@
- C     ('nvals') is known.
- 
-       INTEGER cdim
--      PARAMETER (cdim = 400)
-+      PARAMETER (cdim = 600)
- 
-       CHARACTER name(cdim)*6
- 
-@@ -166,7 +166,7 @@
- C     ('nvals') is known.
- 
-       INTEGER cdim
--      PARAMETER (cdim = 400)
-+      PARAMETER (cdim = 600)
- 
-       CHARACTER name(cdim)*6
- 
 diff -rbU3 Cdist.orig/novas.c Cdist/novas.c
 --- Cdist.orig/novas.c	2011-03-22 15:43:29.000000000 +0000
 +++ Cdist/novas.c	2015-12-31 00:56:27.000000000 +0000
@@ -97,3 +76,19 @@ diff -rbU3 Cdist.orig/novas.c Cdist/novas.c
  
           ha_eq = fmod (ha_eq, 360.0) / 15.0;
           if (ha_eq < 0.0)
+diff -rU3 Cdist.orig/readeph0.c Cdist/readeph0.c
+--- Cdist.orig/readeph0.c	2011-01-21 06:48:11.000000000 -0800
++++ Cdist/readeph0.c	2018-03-25 14:19:09.451989040 -0700
+@@ -94,9 +94,9 @@
+    formal parameter" compiler warnings.
+ */
+ 
+-   mp;
+-   name;
+-   jd;
++   (void)mp;
++   (void)name;
++   (void)jd;
+ 
+    pv = (double *) malloc (6L * sizeof (double));
+ 

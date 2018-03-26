@@ -23,7 +23,7 @@ $(LIBNAME): $(OBJECTS)
 	ar r $(LIBNAME) $(OBJECTS)
 
 clean:
-	@rm -f $(TARGET) $(OBJECTS) $(SOURCES:%.c=%.d)
+	@rm -f $(LIBNAME) $(OBJECTS) $(SOURCES:%.c=%.d)
 
 ### Dependencies ###
 
