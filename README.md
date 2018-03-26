@@ -5,15 +5,14 @@ astronomy work with the latest planetary ephemerides
 published by the NASA Jet Propulsion Laboratory, using
 the NOVAS-C library.
 
-This project leverages the latest general purpose JPL Ephemeris (DE430) and
-NOVAS-C release (3.1).  NOVAS-C, and the JPL Ephemeris
-and utility software are free to download from the publishers.
+NOVAS-C and the JPL Ephemerides are free to download from the publishers.
 Neither is provided here, although a setup script downloads both.
 
-Included in this source code repository are two sample programs
-which use NOVAS-C to calculate the apparent position of the Sun
-and planets from an observation point on Earth, and a program to
-display upcoming tropical moments (equinox and solstice).
+Included in this project are two sample programs:
+
+* `planets` -- Calculates the apparent position of the Sun
+and planets from an observation point on Earth
+* `tropical` -- Displays upcoming tropical moments (equinox and solstice)
 
 ### Basic vector astronomy using NOVAS
 
@@ -28,22 +27,25 @@ This project uses the NOVAS-C library to calculate the sky positions of
 the planets, Sun and Moon, from an observer at a fixed location on Earth;
 and predicts future solstices and equinoxes.
 
-The latest version of the library, as of 2015-12-30, is NOVAS-C 3.1.
+The latest version of the library is NOVAS-C 3.1.
 The setup script will also apply fixes for the two (as of 2018-Mar-25)
 [known issues](http://aa.usno.navy.mil/software/novas/novas_faq.php)
 in NOVAS-C 3.1.
 
 This project uses the general purpose planetary ephemeris file DE430, published
 15-Aug-2013 by the National Aeronautics and Space Administration
-Jet Propulsion Laboratory (NASA JPL, or simply "JPL"). The JPL published
-the DE431 ephemeris which adds a few meters of error in the position of the Moon
-over the time range of DE430, but covers a time range of more than 30,000 years.
+Jet Propulsion Laboratory (NASA JPL, or simply "JPL"). The JPL also publishes
+the DE431 ephemeris which covers a time range of more than 30,000 years.
 Those wishing to work with planetary positions more than 500 years ago, or 500 years
 in the future, should download DE431.
 
+More information about these JPL products is provided in
+[The Planetary and Lunar Ephemerides DE430 and DE431](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de430_and_de431.pdf).
+
 ### NOVAS-C References
 
-For your reference... and to make sure things haven't changed too much.
+The United States Naval Observatory publishes NOVAS-C. More information is avaiable
+at the following links:
 
 [Naval Observatory Vector Astronomy Software](http://aa.usno.navy.mil/software/novas/novas_info.php)
 
@@ -67,17 +69,13 @@ several times before it completes successfully.
 
 ## Mac (Darwin) support
 
-This project has been tested on MacOS, after installing gcc and gfortran.
-More information about obtaining the binaries is available at
-https://gcc.gnu.org/wiki/GFortranBinaries
+This project has been tested on MacOS, using gcc.
 
 ## What about Microsoft Windows?
 
 This code should build and run on Windows using Microsoft
 Visual Studio, however, you will need to create the solution (.sln)
-file. As of now, it has not been tested on this platform, but
-there is no reason it shouldn't work, after possibly fixing a few
-compiler errors.
+file. It has not yet been tested on this platform.
 
 A pull request providing successful results on Windows would be welcome.
 
@@ -145,6 +143,3 @@ That document provides the definitive reference to NOVAS-C, and is
 therefore required reading if you want to get the best results.
 
 Bangert, J., Puatua, W., Kaplan, G., Bartlett, J., Harris, W., Fredericks, A., & Monet, A. (2011) User's Guide to NOVAS Version C3.1 (Washington, DC: USNO).
-
-NASA JPL published [this paper (pdf)](https://naif.jpl.nasa.gov/pub/naif/generic_kernels/spk/planets/de430_and_de431.pdf) in 2014,
-describing the planetary and lunar ephemerides DE430 and DE431.
