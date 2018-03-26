@@ -1,6 +1,6 @@
 CC = gcc
 BUILD ?= debug
-CFLAGS = -Wall -Werror -Wextra
+CFLAGS = -Wall -Wextra
 LDFLAGS = -lm
 
 TARGETS = checkout-stars example

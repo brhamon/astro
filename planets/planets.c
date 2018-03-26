@@ -176,10 +176,13 @@ int planets_main(const on_surface *obs, struct tm *utc) {
     char ttl[85];
     char dt_str[32];
 
-    short int error = bull_a_init();
-    if (error != 0) {
-        printf("Error %d from bull_a_init.", error);
-        goto out2;
+    short int error = 0;
+    if (f_bull_a) {
+        error = bull_a_init();
+        if (error != 0) {
+            printf("Error %d from bull_a_init.", error);
+            goto out2;
+        }
     }
     make_on_surface(obs->latitude, obs->longitude, obs->height, obs->temperature,
             obs->pressure, &geo_loc);
@@ -309,7 +312,9 @@ int planets_main(const on_surface *obs, struct tm *utc) {
             moon_phase_names[phindex], (double)(phindex * 45) - normalize(phlon, 360.0));
 
 out:
-    bull_a_cleanup();
+    if (f_bull_a) {
+        bull_a_cleanup();
+    }
 out2:
     return error;
 }
