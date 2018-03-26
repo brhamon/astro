@@ -97,6 +97,8 @@ planets/planets -h
 watch planets/planets
 ```
 
+![Screen shot of planets](demo.png)
+
 ## Tropical
 
 The `tropical` program displays upcoming tropical moments
