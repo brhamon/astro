@@ -13,7 +13,7 @@ if [[ ! -f .Cdist.is_patched ]]; then
 		rm -fr Cdist
 	fi
 	echo "Reading NOVAS-C"
-	curl $MY_CURLOPTS -O http://aa.usno.navy.mil/software/novas/novas_c/novasc3.1.tar.gz
+	curl $MY_CURLOPTS -O https://aa.usno.navy.mil/software/novas/novas_c/novasc3.1.tar.gz
 	tar -xzf novasc3.1.tar.gz
 	echo "Patching NOVAS-C"
 	pushd Cdist
