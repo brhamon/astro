@@ -38,7 +38,7 @@ char *as_dms(char* buf, double val, int is_latitude) {
     val *= 60.0;
     if (is_latitude < 0 || is_latitude > 1) {
         snprintf(dbuf, sizeof(dbuf), "%s%d", sign < 0 ? "-" : "", deg);
-        snprintf(buf, 16, "%4s\u00b0%02d'%04.1lf\"", dbuf, min, val);
+        snprintf(buf, 16, "%4.4s\u00b0%02d'%04.1lf\"", dbuf, min, val);
     } else {
         snprintf(buf, 16, "%d\u00b0%02d'%04.1lf\"%c", deg, min, val,
                 direction[is_latitude][sign < 0 ? 1: 0]);
