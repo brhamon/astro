@@ -11,7 +11,7 @@ CKS_OBJECTS = $(CKS_SOURCES:%.c=%.o)
 EX_OBJECTS = $(EX_SOURCES:%.c=%.o)
 
 LIBNAME = novas.a
-SOURCES = novas.c novascon.c nutation.c solsys2.c readeph0.c jpleph.c jplint.c
+SOURCES = novas.c novascon.c nutation.c solsys1.c readeph0.c eph_manager.c
 OBJECTS = $(SOURCES:%.c=%.o)
 
 # ar r $(LIBNAME) $(OBJECTS)
@@ -55,4 +55,3 @@ include $(SOURCES:%.c=%.d)
 endif
 
 # vim: set noexpandtab tabstop=4 shiftwidth=4 softtabstop=4:
-

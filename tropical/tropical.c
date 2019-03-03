@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "bull_a.h"
-#include <jpleph.h>
+#include <eph_manager.h>
 
 static object sol;
 static short int accuracy;
@@ -240,7 +240,9 @@ int main(void) {
 
     char workpath[PATH_MAX];
     get_ephfilename(workpath, sizeof(workpath), 1);
-    g_ephfile_name = workpath;
+    double jd_begin, jd_end;
+    short int de_number;
+    ephem_open(workpath, &jd_begin, &jd_end, &de_number);
 
     accuracy = 0;
     if ((error = bull_a_init()) != 0) {
@@ -261,7 +263,7 @@ int main(void) {
 
     list_next_moments(2);
     bull_a_cleanup();
-    finalize_jpleph();
+    ephem_close();
     return 0;
 }
 /* vim:set ts=4 sts=4 sw=4 cindent expandtab: */

@@ -1,7 +1,16 @@
 diff -rbU3 Cdist.orig/eph_manager.c Cdist/eph_manager.c
---- Cdist.orig/eph_manager.c	2011-02-03 19:37:12.000000000 +0000
-+++ Cdist/eph_manager.c	2015-12-31 00:58:48.000000000 +0000
-@@ -321,6 +321,7 @@
+--- Cdist.orig/eph_manager.c	2019-03-03 14:13:06.555531500 -0800
++++ Cdist/eph_manager.c	2019-03-03 14:15:57.504208200 -0800
+@@ -234,6 +234,8 @@
+             break;
+          case 403: case 405:
+          case 421:
++         case 430:
++         case 431:
+             RECORD_LENGTH = 8144;
+             break;
+          case 404: case 406:
+@@ -321,6 +323,7 @@
     if (EPHFILE)
     {
        error =  (short int) fclose (EPHFILE);
@@ -9,64 +18,9 @@ diff -rbU3 Cdist.orig/eph_manager.c Cdist/eph_manager.c
        free (BUFFER);
     }
     return error;
-diff -rbU3 Cdist.orig/example.c Cdist/example.c
---- Cdist.orig/example.c	2011-01-21 14:48:11.000000000 +0000
-+++ Cdist/example.c	2015-12-31 00:54:59.000000000 +0000
-@@ -13,7 +13,6 @@
- #include <stdio.h>
- #include <stdlib.h>
- #include <math.h>
--#include "eph_manager.h" /* remove this line for use with solsys version 2 */
- #include "novas.h"
- 
- 
-@@ -105,33 +104,13 @@
-    }
-    
- /*
--   Open the JPL binary ephemeris file, here named "JPLEPH".
--   Remove this block for use with solsys version 2.
--*/
--
--   if ((error = ephem_open ("JPLEPH", &jd_beg,&jd_end,&de_num)) != 0)
--   {
--      if (error == 1)
--         printf ("JPL ephemeris file not found.\n");
--       else
--         printf ("Error reading JPL ephemeris file header.\n");
--      return (error);
--   }
--    else
--   {
--      printf ("JPL ephemeris DE%d open. Start JD = %10.2f  End JD = %10.2f\n",
--         de_num, jd_beg, jd_end);
--      printf ("\n");
--   }
--
--/*
-   Uncomment block below for use with solsys version 2
-   Prints alternate header
- */
--/*
-+
-    printf ("Using solsys version 2, no description of JPL ephemeris available\n");
-    printf ("\n");
--*/
-+
- 
- /*
-    Write banner.
-@@ -332,7 +311,5 @@
-    printf ("\n");
-    
- 
--   ephem_close();  /* remove this line for use with solsys version 2 */
--      
-    return (0);
- }
 diff -rbU3 Cdist.orig/novas.c Cdist/novas.c
---- Cdist.orig/novas.c	2011-03-22 15:43:29.000000000 +0000
-+++ Cdist/novas.c	2015-12-31 00:56:27.000000000 +0000
+--- Cdist.orig/novas.c	2019-03-03 14:13:06.566442600 -0800
++++ Cdist/novas.c	2019-03-03 14:14:13.948448400 -0800
 @@ -3128,7 +3128,7 @@
     For mean sidereal time, subtract the equation of the equinoxes.
  */
@@ -76,9 +30,9 @@ diff -rbU3 Cdist.orig/novas.c Cdist/novas.c
  
           ha_eq = fmod (ha_eq, 360.0) / 15.0;
           if (ha_eq < 0.0)
-diff -rU3 Cdist.orig/readeph0.c Cdist/readeph0.c
---- Cdist.orig/readeph0.c	2011-01-21 06:48:11.000000000 -0800
-+++ Cdist/readeph0.c	2018-03-25 14:19:09.451989040 -0700
+diff -rbU3 Cdist.orig/readeph0.c Cdist/readeph0.c
+--- Cdist.orig/readeph0.c	2019-03-03 14:13:06.574379500 -0800
++++ Cdist/readeph0.c	2019-03-03 14:14:13.955979500 -0800
 @@ -94,9 +94,9 @@
     formal parameter" compiler warnings.
  */

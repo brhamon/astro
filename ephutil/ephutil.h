@@ -123,10 +123,6 @@ extern int parse_double(const char *str, double *val);
 #define NBR_OF_PLANETS 11
 extern const planet_t the_planets[NBR_OF_PLANETS];
 
-extern void init_eph_const();
-extern void free_eph_const();
-extern double get_eph_const(const char* nam);
-
 /*
  * Read the title string that appears at the beginning of every JPL binary ephemeris
  * file.

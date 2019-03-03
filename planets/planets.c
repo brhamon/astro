@@ -19,7 +19,7 @@
 #include <unistd.h>
 #include "bull_a.h"
 #include <time.h>
-#include <jpleph.h>
+#include <eph_manager.h>
 
 static char our_prog_name[64];
 static const char jpleph_name[] = "JPLEPH";
@@ -431,9 +431,11 @@ int main(int argc, char *argv[]) {
 
     char workpath[PATH_MAX];
     get_ephfilename(workpath, sizeof(workpath), 1);
-    g_ephfile_name = workpath;
+    double jd_begin, jd_end;
+    short int de_number;
+    ephem_open(workpath, &jd_begin, &jd_end, &de_number);
     int res = planets_main(&obs, &utc);
-    finalize_jpleph();
+    ephem_close();
     return res;
 }
 

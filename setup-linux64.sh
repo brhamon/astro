@@ -19,9 +19,6 @@ if [[ ! -f .Cdist.is_patched ]]; then
 	pushd Cdist
 	patch -p1 < ../support/novasc3.1-linux64.patch
 	cp ../support/Makefile.Cdist Makefile
-	for p in jplbin.h jpleph.h jplint.h jpleph.c jplint.c; do
-		cp ../support/$p .
-	done
 	popd
 	touch .Cdist.is_patched
 fi

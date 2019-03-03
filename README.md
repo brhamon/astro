@@ -54,6 +54,12 @@ at the following links:
 [Tarball](http://aa.usno.navy.mil/software/novas/novas_c/novasc3.1.tar.gz)
 
 
+### Prerequisites
+
+curl
+libcurl-devel
+patch
+
 ### Set Up Development Tree
 
 The Bash script `setup-linux64.sh` will download and prepare the
@@ -71,13 +77,10 @@ several times before it completes successfully.
 
 This project has been tested on MacOS, using gcc.
 
-## What about Microsoft Windows?
+## Windows (WSL) support
 
-This code should build and run on Windows using Microsoft
-Visual Studio, however, you will need to create the solution (.sln)
-file. It has not yet been tested on this platform.
-
-A pull request providing successful results on Windows would be welcome.
+This project has been tested on Windows 10, using the Windows Subsystem for Linux.
+The tested WSL distribution was Debian.
 
 # Building applications with NOVAS-C and JPL DE430
 
