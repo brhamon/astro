@@ -19,7 +19,6 @@ char g_local_path[PATH_MAX] = { 0, };
 static const char bull_a_file_name[] = "finals2000A.daily";
 static const char *bull_a_url[] = {
     "http://maia.usno.navy.mil/ser7/finals2000A.daily",
-    "http://toshi.nofs.navy.mil/ser7/finals2000A.daily",
     NULL
 };
 

@@ -1,0 +1,11 @@
+.Cdist.is_patched
+Cdist/
+JPLEPH
+*.d
+*.o
+ephutil/ephutil.a
+linux_p1550p2650.430
+lnxm13000p17000.431
+novasc3.1.tar.gz
+planets/planets
+tropical/tropical

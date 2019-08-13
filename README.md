@@ -56,22 +56,38 @@ at the following links:
 
 ### Prerequisites
 
-curl
-libcurl-devel
-patch
+All distributions:
 
-### Set Up Development Tree
+* patch
+* gcc
+* make
 
-The Bash script `setup-linux64.sh` will download and prepare the
-NOVAS-C sources from the United States Naval Observatory and DE430
-from JPL. (Examine the sources, and change the value of `WANT_DE431`
-to `1`, if you wish to use it instead of DE430.)
+RHEL/CentOs/Fedora:
 
-The files are downloaded via FTP from the JPL and United States
-Naval Observatory sites. You may have to run the setup script
-several times before it completes successfully.
+* curl
+* libcurl-devel
 
-`./setup-linux64.sh`
+Debian/Ubuntu:
+
+* libcurl4
+* libcurl4-openssl-dev
+
+## Build
+
+The Makefile will manage downloading and patching the NOVAS-C library,
+and the DE 430 or DE 431 ephemerides.
+
+By default, the Makefile will select DE 431.
+
+```
+make
+```
+
+If you want to use DE 430, then issue the following command:
+
+```
+make DE=430
+```
 
 ## Mac (Darwin) support
 
@@ -95,7 +111,6 @@ The `planets` program displays the positions of the planets from an
 observer on Earth.
 
 ```
-make -C planets
 planets/planets -h
 watch planets/planets
 ```
@@ -112,7 +127,6 @@ calculations. A local maximum or minimum latitude is the
 solstice, and the crossing of the Equator is the equinox.
 
 ```
-make -C tropical
 tropical/tropical
 ```
 
