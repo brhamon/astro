@@ -6,7 +6,7 @@ published by the NASA Jet Propulsion Laboratory, using
 the NOVAS-C library.
 
 NOVAS-C and the JPL Ephemerides are free to download from the publishers.
-Neither is provided here, although a setup script downloads both.
+Neither is provided here, although the Makefile downloads both.
 
 Included in this project are two sample programs:
 
@@ -28,8 +28,8 @@ the planets, Sun and Moon, from an observer at a fixed location on Earth;
 and predicts future solstices and equinoxes.
 
 The latest version of the library is NOVAS-C 3.1.
-The setup script will also apply fixes for the two (as of 2018-Mar-25)
-[known issues](http://aa.usno.navy.mil/software/novas/novas_faq.php)
+The Makefile also applies fixes for the two (as of 2019-Aug-12)
+[known issues](https://aa.usno.navy.mil/software/novas/novas_faq.php)
 in NOVAS-C 3.1.
 
 This project uses the general purpose planetary ephemeris file DE430, published
@@ -77,16 +77,16 @@ Debian/Ubuntu:
 The Makefile will manage downloading and patching the NOVAS-C library,
 and the DE 430 or DE 431 ephemerides.
 
-By default, the Makefile will select DE 431.
+By default, the Makefile will select DE 430.
 
 ```
 make
 ```
 
-If you want to use DE 430, then issue the following command:
+If you want to use DE 431, then issue the following command:
 
 ```
-make DE=430
+make DE=431
 ```
 
 ## Mac (Darwin) support

@@ -1,4 +1,4 @@
-DE ?= 431
+DE ?= 430
 ASTRO_PATH = ~/.astro
 JPLEPH_LINK = $(ASTRO_PATH)/JPLEPH
 NOVAS_URL = https://aa.usno.navy.mil/software/novas/novas_c/novasc3.1.tar.gz
