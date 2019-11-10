@@ -18,7 +18,7 @@ char g_local_path[PATH_MAX] = { 0, };
 
 static const char bull_a_file_name[] = "finals2000A.daily";
 static const char *bull_a_url[] = {
-    "http://maia.usno.navy.mil/ser7/finals2000A.daily",
+    "ftp://ftp.iers.org/products/eop/rapid/daily/finals2000A.daily",
     NULL
 };
 
@@ -76,7 +76,7 @@ static int fetch_url(const char* url, char* data, size_t data_size,
     }
 
     curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
-    if (code != 200) {
+    if (code != 200 && code != 226) {
         printf("error: server responded with code %ld\n", code);
         goto error;
     }
