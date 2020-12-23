@@ -127,7 +127,7 @@ int find_moments(double cur_jd, moment_t* outs, int outs_sz)
         hint.ub = zbrent(subsolar_latitude, &ranges[i], one_second_jd);
         if (i != 0) {
             midp=0.5*(hint.ub + hint.lb);
-            (void)brent(hint.lb, midp, hint.ub, subsolar_latitude, one_second_jd,
+            (void)brent(hint.lb, midp, hint.ub, subsolar_latitude, one_second_jd / midp,
                     &sol_jd, subsolar_latitude(midp) < 0.0);
             if (sol_jd >= cur_jd) {
                 if (++nbr_of_outs < outs_sz) {
