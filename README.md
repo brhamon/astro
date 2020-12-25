@@ -145,22 +145,22 @@ tropical/tropical
 The output will look like:
 ```
 Ephemeris: JPL Planetary Ephemeris DE430/LE430
-June solstice occurs at 2018-06-21 19:52:06 UTC
-  Subsolar point: {23°26'04.7"N 117°33'47.5"W} [{23.4346361922, -117.5631956988}]
-September equinox occurs at 2018-09-23 00:42:53 UTC
-  Subsolar point: {0°01'09.3"N 167°24'43.0"E} [{0.0192365702, 167.4119554468}]
-December solstice occurs at 2018-12-21 11:21:39 UTC
-  Subsolar point: {23°26'04.6"S 9°05'41.4"E} [{-23.4346196427, 9.0948333703}]
-March equinox occurs at 2019-03-20 22:00:25 UTC
-  Subsolar point: {0°00'02.5"N 148°14'49.4"W} [{0.0006938732, -148.2470566509}]
-June solstice occurs at 2019-06-22 04:21:21 UTC
-  Subsolar point: {23°26'05.4"N 115°07'59.0"E} [{23.4348224251, 115.1330580705}]
-September equinox occurs at 2019-09-23 09:13:52 UTC
-  Subsolar point: {0°01'21.6"S 39°39'06.1"E} [{-0.0226555423, 39.6516846115}]
-December solstice occurs at 2019-12-21 18:33:14 UTC
-  Subsolar point: {23°26'07.7"S 98°47'52.7"W} [{-23.4354646112, -98.7979609006}]
-March equinox occurs at 2020-03-20 03:52:35 UTC
-  Subsolar point: {0°00'03.3"N 123°42'36.8"E} [{0.0009214862, 123.7102242062}]
+December solstice occurs at 2020-12-21 11:39:25 UTC
+  Subsolar point: {23°26'13.7"S 4°43'09.3"E} [{-23.4371276537, 4.7192607927}]
+March equinox occurs at 2021-03-20 09:36:58 UTC
+  Subsolar point: {0°00'00.0"N 37°36'55.5"E} [{0.0000000003, 37.6154224069}]
+June solstice occurs at 2021-06-21 04:14:10 UTC
+  Subsolar point: {23°26'15.0"N 116°54'03.7"E} [{23.4375081716, 116.9010325250}]
+September equinox occurs at 2021-09-22 19:20:13 UTC
+  Subsolar point: {0°00'00.0"S 111°55'32.7"W} [{-0.0000000003, -111.9257542590}]
+December solstice occurs at 2021-12-21 16:31:35 UTC
+  Subsolar point: {23°26'15.3"S 68°20'03.6"W} [{-23.4375879062, -68.3343235616}]
+March equinox occurs at 2022-03-20 15:33:45 UTC
+  Subsolar point: {0°00'00.0"S 51°34'58.3"W} [{-0.0000000003, -51.5828667837}]
+June solstice occurs at 2022-06-21 07:53:23 UTC
+  Subsolar point: {23°26'16.4"N 62°05'57.1"E} [{23.4378819870, 62.0991819233}]
+September equinox occurs at 2022-09-23 01:04:36 UTC
+  Subsolar point: {0°00'00.0"S 161°58'55.1"E} [{-0.0000000005, 161.9819757694}]
 ```
 
 # Citation and Further Reading
