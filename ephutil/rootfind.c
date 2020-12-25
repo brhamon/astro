@@ -1,6 +1,12 @@
+/*
+ * rootfind.c -- root and minima finding functions
+ * 
+ * Copyright (c) 1987, 1988, 1992, 1997 by Numerical Recipies Software.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <float.h>
 #include "ephutil.h"
 
 /*
@@ -12,8 +18,6 @@
  * <out_ranges_size>.
  *
  * This function is derived from zbrak from NR.
- *
- * Copyright (c) 1987, 1988, 1992, 1997 by Numerical Recipies Software.
  */
 int bracket_roots(basic_fn func, const real_range *in_range, int intervals,
         real_range out_ranges[], int out_ranges_size)
@@ -44,8 +48,6 @@ int bracket_roots(basic_fn func, const real_range *in_range, int intervals,
 }
 
 #define ITMAX 100
-#define EPS 3.0e-8
-#define ZEPS 1.0e-10
 #define CGOLD 0.3819660
 
 /*
@@ -53,8 +55,6 @@ int bracket_roots(basic_fn func, const real_range *in_range, int intervals,
  *
  * Find the root of <func> in the range <in_range>. The returned root
  * will be refined until its accuracy is <tol>.
- *
- * Copyright (c) 1987, 1988, 1992, 1997 by Numerical Recipies Software.
  */
 double zbrent(basic_fn func, const real_range *in_range, double tol)
 {
@@ -86,7 +86,7 @@ double zbrent(basic_fn func, const real_range *in_range, double tol)
             fb = fc;
             fc = fa;
         }
-        tol1 = 2.0 * EPS * fabs(b) + 0.5 * tol;
+        tol1 = 2.0 * DBL_EPSILON * fabs(b) + 0.5 * tol;
         xm = 0.5 * (c - b);
         if (fabs(xm) <= tol1 || fb == 0.0) {
             return b;
@@ -134,15 +134,23 @@ double zbrent(basic_fn func, const real_range *in_range, double tol)
 }
 
 /*
- * zbrent -- implementation of Brent's method to find a local min/max
+ * apply_sign -- return a value that has the same sign as another
+ * 
+ * Examine the sign of <b>, and if different than <a>, reverse
+ * the sign of <a>. Return the resulting <a>.
+ */
+static inline double apply_sign(double a, double b) {
+    return (b >= 0.0 ? fabs(a) : -fabs(a));
+}
+
+/*
+ * brent -- implementation of Brent's method to find a local min/max
  *
  * Given a function <func> defined over the range [ax, cx], and <bx>, a value
  * within the range where func(bx) is less than/greater than both func(ax)
  * and func(cx), isolate the minium/maximum within tolerance <tol> using
  * Brent's method. The abcissa of the mimum is stored in <xmin>.
  * The function returns func(*xmin).
- *
- * Copyright (c) 1987, 1988, 1992, 1997 by Numerical Recipies Software.
  */
 double brent(double ax, double bx, double cx, basic_fn func, double tol,
         double *xmin, int f_find_min)
@@ -156,7 +164,7 @@ double brent(double ax, double bx, double cx, basic_fn func, double tol,
     fw = fv = fx = (f_find_min ? func(x) : -(func(x)));
     for (iter=0; iter < ITMAX; ++iter) {
         xm = 0.5 * (a + b);
-        tol1 = tol * fabs(x) + ZEPS;
+        tol1 = tol * fabs(x) + DBL_EPSILON;
         tol2 = 2.0 * tol1;
         if (fabs(x - xm) <= (tol2 - 0.5 * (b - a))) {
             *xmin = x;
@@ -181,14 +189,14 @@ double brent(double ax, double bx, double cx, basic_fn func, double tol,
                 d = p / q;
                 u = x + d;
                 if (u - a < tol2 || b - u < tol2) {
-                    d=(xm - x) >= 0.0 ? fabs(tol1) : -fabs(tol1);
+                    d = apply_sign(tol1, xm - x);
                 }
             }
         } else {
             e = (x >= xm) ? a - x : b - x;
             d = CGOLD * e;
         }
-        u = (fabs(d) >= tol1 ? x + d : x + (d >= 0.0 ? fabs(tol1) : -fabs(tol1)));
+        u = (fabs(d) >= tol1 ? x + d : x + apply_sign(tol1, d));
         fu = f_find_min ? func(u) : -(func(u));
         if (fu <= fx) {
             if (u >= x) {
@@ -223,4 +231,3 @@ double brent(double ax, double bx, double cx, basic_fn func, double tol,
     *xmin = x;
     return f_find_min ? fx : -fx;
 }
-

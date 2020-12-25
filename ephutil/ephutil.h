@@ -3,6 +3,7 @@
 
 #include <limits.h>
 #include <novas.h>
+#include <float.h>
 
 /*
 coord_sys:
@@ -94,7 +95,7 @@ typedef struct {
  * obs -- observation parameters convenience structure
  */
 static inline int is_neg(double a) {
-    return a < 0.0;
+    return a <= -DBL_EPSILON;
 }
 
 static inline int signs_same(double a, double b) {

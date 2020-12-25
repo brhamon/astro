@@ -20,6 +20,11 @@
 #include <sys/stat.h>
 #include "bull_a.h"
 #include <eph_manager.h>
+#include <float.h>
+#if USE_KPLOT
+#include "plot.h"
+#define CHART_RANGE (4.0/86400.0)
+#endif
 
 static object sol;
 static short int accuracy;
@@ -112,8 +117,8 @@ int find_moments(double cur_jd, moment_t* outs, int outs_sz)
     short int error;
     int nbr_of_outs=0;
 
-    hint.lb = cur_jd - (sidereal_year_in_days * 0.51);
-    hint.ub = cur_jd + (sidereal_year_in_days * 1.02);
+    hint.lb = cur_jd - (sidereal_year_in_days * 0.5 + DBL_EPSILON);
+    hint.ub = cur_jd + (sidereal_year_in_days * 1.0 + DBL_EPSILON);
 
     nbr_of_roots = bracket_roots(subsolar_latitude, &hint, NELTS(ranges), ranges,
             NELTS(ranges));
@@ -124,12 +129,15 @@ int find_moments(double cur_jd, moment_t* outs, int outs_sz)
     }
     for (i=0; i < nbr_of_roots; ++i) {
         hint.lb = hint.ub;
-        hint.ub = zbrent(subsolar_latitude, &ranges[i], one_second_jd);
+        hint.ub = zbrent(subsolar_latitude, &ranges[i], one_second_jd / hint.lb);
         if (i != 0) {
             midp=0.5*(hint.ub + hint.lb);
-            (void)brent(hint.lb, midp, hint.ub, subsolar_latitude, one_second_jd / midp,
+            (void)brent(hint.lb, midp, hint.ub, subsolar_latitude, one_second_jd / midp * 0.5,
                     &sol_jd, subsolar_latitude(midp) < 0.0);
             if (sol_jd >= cur_jd) {
+#if USE_KPLOT
+                plot_me(sol_jd - (CHART_RANGE * 0.5), sol_jd + (CHART_RANGE * 0.5), 512, subsolar_latitude);
+#endif
                 if (++nbr_of_outs < outs_sz) {
                     error = sample_transit_coord(outs, sol_jd);
                     if (error != 0) {
@@ -143,6 +151,9 @@ int find_moments(double cur_jd, moment_t* outs, int outs_sz)
             }
         }
         if (hint.ub >= cur_jd) {
+#if USE_KPLOT
+            plot_me(hint.ub - (CHART_RANGE * 0.5), hint.ub + (CHART_RANGE * 0.5), 512, subsolar_latitude);
+#endif
             if (++nbr_of_outs < outs_sz) {
                 error = sample_transit_coord(outs, hint.ub);
                 if (error != 0) {

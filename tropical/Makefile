@@ -14,8 +14,6 @@ LDFLAGS = -lm -lcurl
 TARGET = tropical
 SOURCES = tropical.c
 
-OBJECTS = $(SOURCES:%.c=%.o)
-
 ifeq ($(BUILD),debug)
 CFLAGS += -g
 else
@@ -23,12 +21,19 @@ ifeq ($(BUILD),release)
 CFLAGS += -O3 -DNDEBUG
 endif
 endif
+ifneq ($(strip $(KPLOT)),)
+CFLAGS += -DUSE_KPLOT=$(KPLOT)
+STLIBS += /usr/local/lib/libkplot.a -lcairo
+SOURCES += plot.c
+endif
+
+OBJECTS = $(SOURCES:%.c=%.o)
 
 .PHONY: all clean
 
 all: $(TARGET)
 
-$(TARGET): $(OBJECTS) $(NOVASLIB) $(EPHUTLIB)
+$(TARGET): $(OBJECTS) $(NOVASLIB) $(EPHUTLIB) $(STLIBS)
 
 $(NOVASLIB):
 	make -C $(NOVASPATH) $(NOVAS)
@@ -52,5 +57,3 @@ clean:
 ifneq ($(MAKECMDGOALS),clean)
 include $(SOURCES:%.c=%.d)
 endif
-
-# vim: set noexpandtab tabstop=4 shiftwidth=4 softtabstop=4:
