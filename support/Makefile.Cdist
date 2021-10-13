@@ -1,7 +1,7 @@
 CC = gcc
 BUILD ?= debug
 CFLAGS = -Wall -Wextra
-LDFLAGS = -lm
+LDLIBS = -lm
 
 TARGETS = checkout-stars example
 CKS_SOURCES = checkout-stars.c
