@@ -8,7 +8,7 @@ EPHUT = ephutil.a
 EPHUTPATH = ../ephutil
 EPHUTLIB = $(EPHUTPATH)/$(EPHUT)
 
-CFLAGS = -Wall -Wextra -I $(NOVASPATH) -I $(EPHUTPATH)
+CFLAGS = -std=c99 -Wall -Werror -Wextra -D_POSIX_SOURCE -I $(NOVASPATH) -I $(EPHUTPATH)
 LDLIBS = -lm -lcurl
 
 TARGET = planets
