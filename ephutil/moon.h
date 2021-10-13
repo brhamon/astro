@@ -1,9 +1,12 @@
+#ifndef MOON_H_
+#define MOON_H_ 1
+
 #include <novas.h>
 #include "ephutil.h"
 
 #define NBR_OF_MOON_PHASES 8
 
-const char *moon_phase_names[NBR_OF_MOON_PHASES];
+extern const char *moon_phase_names[NBR_OF_MOON_PHASES];
 
 /*
  * Calculate the equatorial spherical coordinates of the solar transit point with
@@ -36,3 +39,5 @@ const char *moon_phase_names[NBR_OF_MOON_PHASES];
 short int moon_phase(time_parameters_t* tp,
         object* sun, object* moon, short int accuracy,
         double* phlat, double* phlon, int* phindex);
+
+#endif

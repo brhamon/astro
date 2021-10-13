@@ -1,16 +1,19 @@
-diff -rbU3 Cdist.orig/eph_manager.c Cdist/eph_manager.c
---- Cdist.orig/eph_manager.c	2019-03-03 14:13:06.555531500 -0800
-+++ Cdist/eph_manager.c	2019-03-03 14:15:57.504208200 -0800
-@@ -234,6 +234,8 @@
+Only in Cdist.new: .Cdist.is_patched
+diff -U3 -r Cdist/eph_manager.c Cdist.new/eph_manager.c
+--- Cdist/eph_manager.c	2011-02-03 11:37:12.000000000 -0800
++++ Cdist.new/eph_manager.c	2021-10-12 20:32:56.232579302 -0700
+@@ -234,6 +234,10 @@
              break;
           case 403: case 405:
           case 421:
 +         case 430:
 +         case 431:
++         case 440:
++         case 441:
              RECORD_LENGTH = 8144;
              break;
           case 404: case 406:
-@@ -321,6 +323,7 @@
+@@ -321,6 +325,7 @@
     if (EPHFILE)
     {
        error =  (short int) fclose (EPHFILE);
@@ -18,9 +21,13 @@ diff -rbU3 Cdist.orig/eph_manager.c Cdist/eph_manager.c
        free (BUFFER);
     }
     return error;
-diff -rbU3 Cdist.orig/novas.c Cdist/novas.c
---- Cdist.orig/novas.c	2019-03-03 14:13:06.566442600 -0800
-+++ Cdist/novas.c	2019-03-03 14:14:13.948448400 -0800
+Only in Cdist.new: header.440
+Only in Cdist.new: linux_m13000p17000.441
+Only in Cdist.new: linux_p1550p2650.440
+Only in Cdist.new: Makefile
+diff -U3 -r Cdist/novas.c Cdist.new/novas.c
+--- Cdist/novas.c	2011-03-22 08:43:29.000000000 -0700
++++ Cdist.new/novas.c	2021-10-12 20:43:30.634010238 -0700
 @@ -3128,7 +3128,7 @@
     For mean sidereal time, subtract the equation of the equinoxes.
  */
@@ -30,9 +37,36 @@ diff -rbU3 Cdist.orig/novas.c Cdist/novas.c
  
           ha_eq = fmod (ha_eq, 360.0) / 15.0;
           if (ha_eq < 0.0)
-diff -rbU3 Cdist.orig/readeph0.c Cdist/readeph0.c
---- Cdist.orig/readeph0.c	2019-03-03 14:13:06.574379500 -0800
-+++ Cdist/readeph0.c	2019-03-03 14:14:13.955979500 -0800
+@@ -7969,7 +7969,7 @@
+    the last value of 'n_pts'.
+ */
+ 
+-   del_n_pts = abs (n_pts - last_n_pts);
++   del_n_pts = labs (n_pts - last_n_pts);
+ 
+ /*
+    Allocate memory for the 't' and 'ra' arrays.
+@@ -8032,7 +8032,7 @@
+ */
+ 
+    del_index = index_rec - last_index_rec;
+-   abs_del_index = abs (del_index);
++   abs_del_index = labs (del_index);
+ 
+ /*
+    Determine the file read strategy.
+@@ -8069,7 +8069,7 @@
+ 
+     else if ((abs_del_index <= n_pts) && (del_n_pts == 0))
+    {
+-      n_swap = abs (n_pts - abs_del_index);
++      n_swap = labs (n_pts - abs_del_index);
+       n_read = abs_del_index;
+ 
+ /*
+diff -U3 -r Cdist/readeph0.c Cdist.new/readeph0.c
+--- Cdist/readeph0.c	2011-01-21 06:48:11.000000000 -0800
++++ Cdist.new/readeph0.c	2019-08-12 23:38:31.297605651 -0700
 @@ -94,9 +94,9 @@
     formal parameter" compiler warnings.
  */
@@ -46,3 +80,4 @@ diff -rbU3 Cdist.orig/readeph0.c Cdist/readeph0.c
  
     pv = (double *) malloc (6L * sizeof (double));
  
+Only in Cdist.new: testpo.440

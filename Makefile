@@ -1,9 +1,13 @@
-DE ?= 430
+DE ?= 440
 ASTRO_PATH = ~/.astro
 JPLEPH_LINK = $(ASTRO_PATH)/JPLEPH
 NOVAS_URL = https://aa.usno.navy.mil/software/novas/novas_c/novasc3.1.tar.gz
 NOVAS_TGZ := $(shell basename $(NOVAS_URL))
 CURLOPTS = --connect-timeout 20 --no-keepalive
+ifeq ($(DE),440)
+DE_URL := ftp://ssd.jpl.nasa.gov/pub/eph/planets/Linux/de430/linux_p1550p2650.440
+DE_CKSUM = 29915576d0a6555766b99485ac3056ee415e86df4fce282611c31afb329ad062
+else
 ifeq ($(DE),430)
 DE_URL := ftp://ssd.jpl.nasa.gov/pub/eph/planets/Linux/de430/linux_p1550p2650.430
 DE_CKSUM = 0deb23ca9269496fcbab9f84bec9f3f090e263bfb99c62428b212790721de126
@@ -13,6 +17,7 @@ DE_URL := ftp://ssd.jpl.nasa.gov/pub/eph/planets/Linux/de431/lnxm13000p17000.431
 DE_CKSUM = fe3d0323d26ada11f8d8228fda9ca590c7eb00cee8b22dff1839f74f5be71149
 else
 $(error Unsupported DE)
+endif
 endif
 endif
 DE_FILE := $(shell basename $(DE_URL))
