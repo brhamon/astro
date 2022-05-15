@@ -28,8 +28,8 @@ the planets, Sun and Moon, from an observer at a fixed location on Earth;
 and predicts future solstices and equinoxes.
 
 The latest version of the library is NOVAS-C 3.1.
-The Makefile also applies fixes for the two (as of 2019-Aug-12)
-[known issues](https://aa.usno.navy.mil/software/novas/novas_faq.php)
+The Makefile also applies fixes for the two (as of 2022-May-14)
+[known issues](https://aa.usno.navy.mil/software/novas_faq)
 in NOVAS-C 3.1.
 
 This project uses the general purpose planetary ephemeris file DE440, published
@@ -47,11 +47,11 @@ More information about these JPL products is provided in
 The United States Naval Observatory publishes NOVAS-C. More information is avaiable
 at the following links:
 
-[Naval Observatory Vector Astronomy Software](http://aa.usno.navy.mil/software/novas/novas_info.php)
+[Naval Observatory Vector Astronomy Software](https://aa.usno.navy.mil/software/novas_info)
 
-[C Edition](http://aa.usno.navy.mil/software/novas/novas_c/novasc_info.php)
+[Download NOVAS-C sources](https://ascl.net/1202.003)
 
-[Tarball](http://aa.usno.navy.mil/software/novas/novas_c/novasc3.1.tar.gz)
+[Tarball](https://ascl.net/assets/codes/NOVAS/novasc3.1.zip)
 
 
 ### Prerequisites

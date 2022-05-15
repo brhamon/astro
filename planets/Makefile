@@ -2,7 +2,7 @@ CC = gcc
 BUILD ?= debug
 
 NOVAS = novas.a
-NOVASPATH = ../Cdist
+NOVASPATH = ../novasc3.1
 NOVASLIB = $(NOVASPATH)/$(NOVAS)
 EPHUT = ephutil.a
 EPHUTPATH = ../ephutil
@@ -38,7 +38,7 @@ $(EPHUTLIB):
 
 clean:
 	-rm -f $(TARGET) $(OBJECTS) $(SOURCES:%.c=%.d)
-	make -C ../Cdist clean
+	make -C $(NOVASPATH) clean
 	make -C ../ephutil clean
 
 ### Dependencies ###

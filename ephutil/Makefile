@@ -1,6 +1,6 @@
 CC = gcc
 BUILD ?= debug
-CFLAGS = -std=c99 -Wall -Werror -Wextra -D_POSIX_SOURCE -I../Cdist
+CFLAGS = -std=c99 -Wall -Werror -Wextra -D_POSIX_SOURCE -I../novasc3.1
 
 LIBNAME = ephutil.a
 SOURCES = ephutil.c moon.c strutil.c bull_a.c obs.c rootfind.c

@@ -18,7 +18,7 @@ char g_local_path[PATH_MAX] = { 0, };
 
 static const char bull_a_file_name[] = "finals2000A.daily";
 static const char *bull_a_url[] = {
-    "ftp://ftp.iers.org/products/eop/rapid/daily/finals2000A.daily",
+    "https://datacenter.iers.org/products/eop/rapid/daily/finals2000A.daily",
     NULL
 };
 
