@@ -64,7 +64,7 @@ CSV columns:
   (`units`: 0 = AU/day, 1 = km/s; `jd` split as `jd_hi + jd_lo`, TDB)
 - place: `coord_sys,accuracy,body,where,lat,lon,height,delta_t,jd_tt,ra,dec,dis,rx,ry,rz,rv`
   (`coord_sys`: 0 = GCRS, 1 = true equator & equinox of date (apparent),
-  3 = astrometric — the systems implemented so far; `accuracy`: 0 = full,
+  2 = equator & CIO of date, 3 = astrometric; `accuracy`: 0 = full,
   1 = reduced; `body`: NOVAS number 1..11; `where`: 0 = geocenter, 1 = surface,
   with lat/lon in degrees, height in m, `delta_t` in s; ra in hours, dec in
   degrees, dis in AU, rv in km/s)

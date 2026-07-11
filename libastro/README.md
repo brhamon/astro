@@ -17,9 +17,10 @@ generators in `test/gen/` are the oracles; see `test/`).
 - **Earth orientation** — IAU 2000A / NU2000K nutation, mean obliquity,
   fundamental arguments, precession, frame tie, sidereal time. ✅
 - **Layer 2 `place()`** — solar-system bodies *and* stars (proper motion /
-  parallax); geocentric & surface observers; `gcrs`, `astrometric`, and
-  `equator_equinox` (apparent of date); full & reduced accuracy; radial
-  velocity (`rad_vel`). ✅
+  parallax); geocentric & surface observers; all four coordinate systems
+  (`gcrs`, `astrometric`, `equator_equinox` apparent-of-date, `equator_cio`
+  equator & CIO of date); full & reduced accuracy; radial velocity
+  (`rad_vel`). ✅
 - **`equ2hor`** — apparent RA/Dec → local zenith distance / azimuth, with polar
   motion and refraction. ✅
 - **Civil time** — calendar ⇄ Julian date, leap seconds, and UTC → {TT, UT1,
@@ -28,7 +29,8 @@ generators in `test/gen/` are the oracles; see `test/`).
   public API (`utc_time_scales` → `place` → `equ2hor`), reproducing the legacy
   `planets` core including its Polaris line. ✅
 
-Not yet: `place()` CIO system (`equator_cio`).
+`place()` now covers the full NOVAS coordinate/object surface. Remaining
+niceties: library packaging (install / export / `find_package`).
 
 ## Relationship to the legacy C code
 

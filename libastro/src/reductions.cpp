@@ -615,6 +615,40 @@ double refract_zd(const SurfaceObserver& loc, Refraction ref, double zd_obs) {
   return r * (0.28 * p / (t + 273.0));
 }
 
+// RA of the true equinox (= -equation of origins), in hours. novas.c:ira_equinox
+// with equinox = 1 (true equinox).
+double ira_equinox(double jd_tdb, Accuracy accuracy) {
+  const double t = (jd_tdb - kT0) / 36525.0;
+  double u, v, ee, w, x;
+  e_tilt(jd_tdb, accuracy, &u, &v, &ee, &w, &x);  // ee: eq. of equinoxes (s)
+  const double prec_ra =
+      0.014506 + ((((-0.0000000368 * t - 0.000029956) * t - 0.00000044) * t +
+                   1.3915817) * t + 4612.156534) * t;
+  return -(prec_ra / 15.0 + ee) / 3600.0;
+}
+
+// GCRS basis vectors (x,y,z) of the celestial intermediate system, given the RA
+// of the CIO in the equinox-of-date system (ref_sys 2 -- the analytic, no-CIO-
+// file path). novas.c:cio_basis case 2.
+void cio_basis(double jd_tdb, double ra_cio, Accuracy accuracy, double x[3],
+               double y[3], double z[3]) {
+  double w1[3], w2[3];
+  const double z0[3] = {0.0, 0.0, 1.0};
+  nutation_rot(jd_tdb, -1, accuracy, z0, w1);
+  precession(jd_tdb, w1, kT0, w2);
+  frame_tie(w2, -1, z);  // z toward the celestial pole, in GCRS
+
+  const double w0[3] = {std::cos(ra_cio * 15.0 * kDeg2Rad),
+                        std::sin(ra_cio * 15.0 * kDeg2Rad), 0.0};
+  nutation_rot(jd_tdb, -1, accuracy, w0, w1);
+  precession(jd_tdb, w1, kT0, w2);
+  frame_tie(w2, -1, x);  // x toward the CIO, in GCRS
+
+  y[0] = z[1] * x[2] - z[2] * x[1];  // y = z cross x
+  y[1] = z[2] * x[0] - z[0] * x[2];
+  y[2] = z[0] * x[1] - z[1] * x[0];
+}
+
 // Apply space motion to a star's position over an interval (novas.c:proper_motion).
 void proper_motion(double jd1, const double pos[3], const double vel[3],
                    double jd2, double pos2[3]) {
@@ -720,9 +754,6 @@ std::expected<SkyPos, EphError> place_impl(const Ephemeris& eph,
                                            double delta_t, bool surface,
                                            const SurfaceObserver& loc,
                                            CoordSys sys, Accuracy accuracy) {
-  if (sys == CoordSys::equator_cio)
-    return std::unexpected(EphError::not_implemented);
-
   if (!tgt.is_star) {
     const int n = static_cast<int>(tgt.body);
     if (n < 0 || n > 10 || tgt.body == Point::earth)
@@ -789,6 +820,14 @@ std::expected<SkyPos, EphError> place_impl(const Ephemeris& eph,
     frame_tie(pos5, 1, pos6);
     precession(kT0, pos6, jd_tdb, pos7);
     nutation_rot(jd_tdb, 0, accuracy, pos7, pos8);
+  } else if (sys == CoordSys::equator_cio) {
+    // Project onto the celestial intermediate system (equator & CIO of date).
+    const double ra_cio = -ira_equinox(jd_tdb, accuracy);
+    double px[3], py[3], pz[3];
+    cio_basis(jd_tdb, ra_cio, accuracy, px, py, pz);
+    pos8[0] = dot3(px, pos5);
+    pos8[1] = dot3(py, pos5);
+    pos8[2] = dot3(pz, pos5);
   } else {  // gcrs or astrometric: no frame transform
     for (int i = 0; i < 3; ++i) pos8[i] = pos5[i];
   }
@@ -844,6 +883,11 @@ std::expected<SkyPos, EphError> place(const Ephemeris& eph, const Star& star,
                                       CoordSys sys, Accuracy accuracy) {
   return place_impl(eph, Target{true, Point::sun, star}, t.jd.value(),
                     dt.seconds, /*surface=*/true, observer, sys, accuracy);
+}
+
+double parallax_distance_au(const Star& star) {
+  const double p = star.parallax_mas > 0.0 ? star.parallax_mas : 1.0e-6;
+  return 1.0 / std::sin(p * 1.0e-3 * kAsec2Rad);
 }
 
 HorizonPos equ2hor(Ut1Instant t, DeltaT dt, Accuracy accuracy, PolarMotion pole,
