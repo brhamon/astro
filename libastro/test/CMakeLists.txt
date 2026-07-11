@@ -19,6 +19,7 @@ set(_star_csv "${CMAKE_CURRENT_BINARY_DIR}/star.csv")
 set(_nut_csv "${CMAKE_CURRENT_BINARY_DIR}/nutation.csv")
 set(_hor_csv "${CMAKE_CURRENT_BINARY_DIR}/hor.csv")
 set(_time_csv "${CMAKE_CURRENT_BINARY_DIR}/time.csv")
+set(_ecl_csv "${CMAKE_CURRENT_BINARY_DIR}/ecl.csv")
 
 # Committed golden slices -> replayed when the oracle is unavailable.
 set(_gold "${CMAKE_CURRENT_SOURCE_DIR}/vectors")
@@ -27,7 +28,7 @@ set(_gold "${CMAKE_CURRENT_SOURCE_DIR}/vectors")
 set(_novas_dir "${CMAKE_CURRENT_SOURCE_DIR}/../../novasc3.1")
 if(EXISTS "${_novas_dir}/novas.a")
   enable_language(C)
-  foreach(g gen_vectors gen_place gen_star gen_nutation gen_hor gen_time)
+  foreach(g gen_vectors gen_place gen_star gen_nutation gen_hor gen_time gen_ecl)
     add_executable(${g} gen/${g}.c)
     target_include_directories(${g} PRIVATE "${_novas_dir}")
     target_link_libraries(${g} PRIVATE "${_novas_dir}/novas.a" m)
@@ -51,12 +52,15 @@ else()
 endif()
 
 # --- Test executables --------------------------------------------------------
-foreach(t ephemeris replay constants place star nutation hor time)
+foreach(t ephemeris replay constants place star nutation hor time ecl tropical)
   add_executable(test_${t} unit/test_${t}.cpp)
   target_link_libraries(test_${t} PRIVATE astro::astro)
 endforeach()
 
 add_test(NAME ephemeris COMMAND test_ephemeris)
+
+# tropical_moments: invariants/self-consistency (no NOVAS oracle); needs ephemeris.
+add_test(NAME tropical COMMAND test_tropical)
 
 # --- Oracle-backed numeric tests: regenerate if possible, else golden --------
 # each: gen target, regenerated CSV, golden CSV, fixture name
@@ -88,6 +92,7 @@ oracle_test(place  gen_place   "${_place_csv}" "${_gold}/golden_place_de440.csv"
 oracle_test(star   gen_star    "${_star_csv}"  "${_gold}/golden_star_de440.csv"  STAR_VECTORS)
 oracle_test_noeph(nutation gen_nutation "${_nut_csv}" "${_gold}/golden_nutation.csv" NUTATION)
 oracle_test_noeph(hor      gen_hor      "${_hor_csv}" "${_gold}/golden_hor.csv"      HORIZON)
+oracle_test_noeph(ecl      gen_ecl      "${_ecl_csv}" "${_gold}/golden_ecl.csv"      ECLIPTIC)
 
 # constants validates against con440.c (committed), so it runs without NOVAS.
 if(TARGET gen_constants AND EXISTS "${_jpleph}")
@@ -111,6 +116,6 @@ endif()
 
 # Tests that open the ephemeris need its path.
 if(EXISTS "${_jpleph}")
-  set_tests_properties(ephemeris replay constants place star PROPERTIES
+  set_tests_properties(ephemeris replay constants place star tropical PROPERTIES
     ENVIRONMENT "LIBASTRO_EPHEMERIS=${_jpleph}")
 endif()
