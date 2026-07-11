@@ -1,0 +1,18 @@
+# Build trees
+/build/
+/result
+/result-*
+
+# Fetched artifacts (reproducible via scripts/, never committed)
+/data/JPLEPH
+/data/linux_p*.4*
+/data/lnxm*.4*
+
+# Vendored dependency source (fetched via scripts/vendor_mdspan.sh).
+# Checked in only if you deliberately commit it; ignored by default so the
+# working tree stays light. Remove this line if you vendor-by-commit.
+/third_party/mdspan/
+
+# Editor / tooling
+/.cache/
+compile_commands.json

@@ -1,0 +1,5 @@
+# Committed reference vectors go here (e.g. the USNO checkout-*-usno.txt files).
+#
+# The NOVAS oracle CSVs (state vectors, constants) are NOT committed: they are
+# large and specific to the selected ephemeris, so CTest regenerates them into
+# the build tree per configured ephemeris. See test/gen/ and test/CMakeLists.txt.
