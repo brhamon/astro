@@ -11,6 +11,7 @@
 
 #define _XOPEN_SOURCE
 
+#include <ctype.h>
 #include <novas.h>
 #include <ephutil.h>
 #include <moon.h>
@@ -24,11 +25,16 @@
 static char our_prog_name[64];
 static const char jpleph_name[] = "JPLEPH";
 
+static const double AU_in_m = 149597870691.0;
+
 /*
  * Global settings.
  */
 int f_azi_s = 0;
 int f_bull_a = 1;
+int f_dis_meters = 0;
+int f_style_decimal = 0;
+int f_filter_visible = 0;
 
 /*
  * Information for Polaris (HD8890) is taken from the SKY2000 Master Catalog, Version 5.
@@ -146,7 +152,36 @@ static void get_ephfilename(char *workpath, size_t workpath_len, int f_check_fil
     }
 }
 
-int planets_main(const on_surface *obs, struct tm *utc) {
+
+static int match_filter(const char *str, const char *filter_str)
+{
+    /* a NULL filter_str matches everything */
+    if (filter_str == NULL) return 1;
+
+    int is_matched = 0;
+    const char *tmp_iter = str;
+    const char *tmp_iter_end = tmp_iter + strlen(tmp_iter);
+    int cmp_result = 0;
+    for ( ; !is_matched && *filter_str != 0 ; ++filter_str) {
+        if (*filter_str == ',') {
+            is_matched = cmp_result == 0 && tmp_iter == tmp_iter_end;
+            cmp_result = 0;
+            tmp_iter = str;
+        } else if (cmp_result == 0) {
+            if (tmp_iter == tmp_iter_end) {
+                cmp_result = -1;
+            } else {
+                cmp_result = *tmp_iter++ - toupper(*filter_str);
+            }
+        }
+    }
+    if (!is_matched && cmp_result == 0 && tmp_iter == tmp_iter_end) {
+        is_matched = 1;
+    }
+    return is_matched;
+}
+
+static int planets_main(const on_surface *obs, struct tm *utc, const char *filter_str) {
 /*
  * The following three values are Earth Orientation (EO) paramters published by IERS.
  * See bull_a.c for more information.
@@ -175,6 +210,7 @@ int planets_main(const on_surface *obs, struct tm *utc) {
     char az_str[DMS_MAX];
     char ttl[85];
     char dt_str[32];
+    char tmp_name[SIZE_OF_OBJ_NAME];
 
     short int error = 0;
     if (f_bull_a) {
@@ -189,7 +225,8 @@ int planets_main(const on_surface *obs, struct tm *utc) {
     make_observer_on_surface(obs->latitude, obs->longitude, obs->height, obs->temperature,
             obs->pressure, &obs_loc);
 
-    make_cat_entry("DUMMY","xxx", 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &dummy_star);
+    strcpy(tmp_name, "DUMMY");
+    make_cat_entry(tmp_name,"xxx", 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &dummy_star);
 
     for (index=0; index < NBR_OF_PLANETS; ++index) {
         if (the_planets[index].id == 3) {
@@ -202,7 +239,8 @@ int planets_main(const on_surface *obs, struct tm *utc) {
             goto out;
         }
     }
-    error = make_object(2, 0, "Polaris", &polaris_cat, &polaris);
+    strcpy(tmp_name, "Polaris");
+    error = make_object(2, 0, tmp_name, &polaris_cat, &polaris);
     if (error != 0) {
         printf_if(3, "ERRCODE %d from make_object (%s)\n", error, polaris_cat.starname);
         goto out;
@@ -237,7 +275,8 @@ int planets_main(const on_surface *obs, struct tm *utc) {
             tmp, timep.jd_tt, timep.jd_ut1, timep.delta_t, timep.leapsecs);
     display_rotation(&timep, &geo_loc, accuracy);
 
-    printf("%8s %12s %13s  %18s  %13s  %13s\n", "Object", "RA", "DEC", "DIST", "ZA",
+    printf("%8s %*s %13s  %18s  %13s  %13s\n", "Object", f_style_decimal > 1 ? 13 : 12, "RA", "DEC",
+            f_dis_meters ? "DIST (m)" : "DIST (AU)", "ZA",
             "AZ");
     for (index=0; index < NBR_OF_PLANETS; ++index) {
         if (index == earth_index) {
@@ -250,42 +289,57 @@ int planets_main(const on_surface *obs, struct tm *utc) {
             goto out;
         }
 
+        if (!match_filter(obj[index].name, filter_str)) continue;
+
         /*
          * Position of the planet in local horizon coordinates. Correct for refraction.
          */
         equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
                 t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
         correct_zd_az(&zd, &az);
+        if (f_filter_visible > 0 && zd < -DBL_MIN) continue;
+        if (f_dis_meters) {
+            t_place.dis *= AU_in_m;
+        }
+        as_hms(ra_str, t_place.ra, f_style_decimal > 1 ? 3 : 0);
+        as_dms(dec_str, t_place.dec, f_style_decimal > 1 ? 3 : 2);
+        as_dms(zd_str, zd, f_style_decimal ? 3 : 2);
+        as_dms(az_str, az, f_style_decimal ? 3 : 2);
         printf("%8s %s %s  %18.12e  %s  %s\n",
-               obj[index].name, as_hms(ra_str, t_place.ra),
-               as_dms(dec_str, t_place.dec, 2), t_place.dis, as_dms(zd_str, zd, 2),
-               as_dms(az_str, az, 2));
+               obj[index].name, ra_str, dec_str, t_place.dis, zd_str, az_str);
     }
 
-    /* Polaris provides a helpful frame of reference for the other numbers, since
-     * it's always very close to the CIP.
-     */
-    error = place(timep.jd_tt, &polaris, &obs_loc, timep.delta_t, coord_equ,
-                    accuracy, &t_place);
-    if (error != 0) {
-        printf_if(3, "ERRCODE %d from place.", error);
-        goto out;
-    }
-    equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
-            t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
-    correct_zd_az(&zd, &az);
+    if (match_filter(polaris_cat.starname, filter_str)) {
+        /* Polaris provides a helpful frame of reference for the other numbers, since
+        * it's always very close to the CIP.
+        */
+        error = place(timep.jd_tt, &polaris, &obs_loc, timep.delta_t, coord_equ,
+                        accuracy, &t_place);
+        if (error != 0) {
+            printf_if(3, "ERRCODE %d from place.", error);
+            goto out;
+        }
+        equ2hor(timep.jd_ut1, timep.delta_t, accuracy, x_pole, y_pole, &geo_loc,
+                t_place.ra, t_place.dec, 2, &zd, &az, &rar, &decr);
+        correct_zd_az(&zd, &az);
 
-    /* equ2hor leaves the distance at 0.0. Provide an estimate in AU. */
-    double paralx = polaris_cat.parallax;
-    if (paralx <= 0.0) {
-        paralx = 1.0e-6;
-    }
-    t_place.dis = 1.0 / sin (paralx * 1.0e-3 * ASEC2RAD);
+        /* equ2hor leaves the distance at 0.0. Provide an estimate in AU. */
+        double paralx = polaris_cat.parallax;
+        if (paralx <= 0.0) {
+            paralx = 1.0e-6;
+        }
+        t_place.dis = 1.0 / sin (paralx * 1.0e-3 * ASEC2RAD);
+        if (f_dis_meters) {
+            t_place.dis *= AU_in_m;
+        }
 
-    printf("%8s %s %s  %18.12e  %s  %s\n",
-            polaris_cat.starname, as_hms(ra_str, t_place.ra),
-            as_dms(dec_str, t_place.dec, 2), t_place.dis, as_dms(zd_str, zd, 2),
-            as_dms(az_str, az, 2));
+        as_hms(ra_str, t_place.ra, f_style_decimal > 1 ? 3 : 0);
+        as_dms(dec_str, t_place.dec, f_style_decimal > 1 ? 3 : 2);
+        as_dms(zd_str, zd, f_style_decimal ? 3 : 2);
+        as_dms(az_str, az, f_style_decimal ? 3 : 2);
+        printf("%8s %s %s  %18.12e  %s  %s\n",
+                polaris_cat.starname, ra_str, dec_str, t_place.dis, zd_str, az_str);
+    }
 
     /* Calculate Solar transit info. */
     error = transit_coord(&timep, &obj[9], x_pole, y_pole, accuracy, &decr, &rar);
@@ -296,7 +350,7 @@ int planets_main(const on_surface *obs, struct tm *utc) {
     printf_if(1, "\nSolar transit: {%15.10f %15.10f}\n", decr, rar);
     tmp = rar - geo_loc.longitude;
     printf_if(1, "Transits observer: %15.10f degrees (%s)\n", tmp,
-            as_hms(ra_str, normalize(tmp / 15.0, 24.0)));
+            as_hms(ra_str, normalize(tmp / 15.0, 24.0), 0));
 
     /* Calculate Moon phase info. */
     error = moon_phase(&timep, &obj[9], &obj[10], accuracy, &phlat, &phlon, &phindex);
@@ -331,7 +385,7 @@ static void usage() {
            "  -H NUMBER\n"
            "    Observer's height in meters above sea level\n"
            "  -T NUMBER\n"
-           "    Observer's air temperature in degrees Celcius\n"
+           "    Observer's air temperature in degrees Celsius\n"
            "  -P NUMBER\n"
            "    Observer's air pressure in millibars. To convert inches to\n"
            "    millibars, multiply by 33.8637526.\n"
@@ -346,6 +400,16 @@ static void usage() {
            "    \"degrees east of North\".\n"
            "  -s\n"
            "    Save observer parameters as defaults for future runs.\n"
+           "  -m\n"
+           "    Distances in meters, instead of AU\n"
+           "  -D\n"
+           "    Display ZD/AZ in decimal degrees instead of sexagecimal\n"
+           "  -DD\n"
+           "    Also display RA/DEC in decimal degrees instead of hours/sexagecimal\n"
+           "  -f BODY[,BODY]...\n"
+           "    Include only the listed bodies in the output\n"
+           "  -V\n"
+           "    Only show visible objects (ZA greater than 0.0)\n"
            "  -v\n"
            "    Verbose output\n"
            "  -h\n"
@@ -377,9 +441,10 @@ int main(int argc, char *argv[]) {
     struct tm utc;
     time_now_utc(&utc);
     int f_save_obs = 0;
+    const char *filter_str = NULL;
 
     for (;;) {
-        int c = getopt(argc, argv, ":l:L:H:T:P:t:d:vasAh");
+        int c = getopt(argc, argv, ":l:L:H:T:P:t:d:f:vasAmDVh");
         if (c == -1) {
             break;
         }
@@ -405,6 +470,9 @@ int main(int argc, char *argv[]) {
             case 'd':
                 strptime(optarg, "%x", &utc);
                 break;
+            case 'f':
+                filter_str = optarg;
+                break;
             case 'a':
                 f_azi_s = 1;
                 break;
@@ -416,6 +484,15 @@ int main(int argc, char *argv[]) {
                 break;
             case 'v':
                 ++g_verbosity;
+                break;
+            case 'm':
+                ++f_dis_meters;
+                break;
+            case 'D':
+                ++f_style_decimal;
+                break;
+            case 'V':
+                ++f_filter_visible;
                 break;
             default:
                 printf("Unknown option.\n");
@@ -434,7 +511,7 @@ int main(int argc, char *argv[]) {
     double jd_begin, jd_end;
     short int de_number;
     ephem_open(workpath, &jd_begin, &jd_end, &de_number);
-    int res = planets_main(&obs, &utc);
+    int res = planets_main(&obs, &utc, filter_str);
     ephem_close();
     return res;
 }

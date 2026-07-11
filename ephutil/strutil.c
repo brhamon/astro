@@ -17,51 +17,59 @@ void printf_if(int min_ver, const char *format, ...)
     }
 }
 
-char *as_dms(char* buf, double val, int is_latitude) {
-    static const char *direction[] = { "EW", "NS" };
-    int deg, min;
-    double tmp;
-    int sign = 1;
-    char dbuf[8];
-
-    if (val < 0.0) {
-        sign = -1;
-        val = -val;
-    }
-    tmp = floor(val);
-    val -= tmp;
-    deg = (int)tmp;
-    val *= 60.0;
-    tmp = floor(val);
-    val -= tmp;
-    min = (int)tmp;
-    val *= 60.0;
-    if (is_latitude < 0 || is_latitude > 1) {
-        snprintf(dbuf, sizeof(dbuf), "%s%d", sign < 0 ? "-" : "", deg);
-        snprintf(buf, 16, "%4.4s\u00b0%02d'%04.1lf\"", dbuf, min, val);
+char *as_dms(char* buf, double val, int style) {
+    if (style == 3) {
+        snprintf(buf, 16, "%13.8lf", val);
     } else {
-        snprintf(buf, 16, "%d\u00b0%02d'%04.1lf\"%c", deg, min, val,
-                direction[is_latitude][sign < 0 ? 1: 0]);
-    }
-    return buf;
-}
+        static const char *direction[] = { "EW", "NS" };
+        int deg, min;
+        double tmp;
+        int sign = 1;
+        char dbuf[8];
 
-char *as_hms(char* buf, double val) {
-    int hour, min;
-    double tmp;
-
-    if (val < 0.0 || val >= 24.0) {
-        snprintf(buf, DMS_MAX, "#ERANGE#");
-    } else {
+        if (val < 0.0) {
+            sign = -1;
+            val = -val;
+        }
         tmp = floor(val);
         val -= tmp;
-        hour = (int)tmp;
+        deg = (int)tmp;
         val *= 60.0;
         tmp = floor(val);
         val -= tmp;
         min = (int)tmp;
         val *= 60.0;
-        snprintf(buf, DMS_MAX, "%2dh%02dm%05.2fs", hour, min, val);
+        if (style < 0 || style > 1) {
+            snprintf(dbuf, sizeof(dbuf), "%s%d", sign < 0 ? "-" : "", deg);
+            snprintf(buf, 16, "%4.4s\u00b0%02d'%04.1lf\"", dbuf, min, val);
+        } else {
+            snprintf(buf, 16, "%d\u00b0%02d'%04.1lf\"%c", deg, min, val,
+                    direction[style][sign < 0 ? 1: 0]);
+        }
+    }
+    return buf;
+}
+
+char *as_hms(char* buf, double val, int style) {
+    if (style == 3) {
+        snprintf(buf, 16, "%13.8lf", val * 15.0);
+    } else {
+        int hour, min;
+        double tmp;
+        (void)style;
+        if (val < 0.0 || val >= 24.0) {
+            snprintf(buf, DMS_MAX, "#ERANGE#");
+        } else {
+            tmp = floor(val);
+            val -= tmp;
+            hour = (int)tmp;
+            val *= 60.0;
+            tmp = floor(val);
+            val -= tmp;
+            min = (int)tmp;
+            val *= 60.0;
+            snprintf(buf, DMS_MAX, "%2dh%02dm%05.2fs", hour, min, val);
+        }
     }
     return buf;
 }

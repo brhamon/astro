@@ -59,8 +59,8 @@ typedef struct time_parameters_t_ {
     double delta_t;
 } time_parameters_t;
 
-#define DMS_MAX 15
-#define HMS_MAX 13
+#define DMS_MAX 16
+#define HMS_MAX 16
 
 /* at epoch J2000.0 */
 static const double sidereal_year_in_days = 365.256363004;
@@ -115,8 +115,8 @@ extern double time_to_jd(const struct tm *bdtm);
 extern int time_now_utc(struct tm *bdtm);
 extern double get_jd_utc();
 extern void make_time_parameters(time_parameters_t* tp, double jd_utc, double ut1_utc);
-extern char *as_dms(char* buf, double val, int is_latitude);
-extern char *as_hms(char* buf, double val);
+extern char *as_dms(char* buf, double val, int style);
+extern char *as_hms(char* buf, double val, int style);
 
 extern void get_rtrim(char* out, size_t max_out, const char* in_beg, const char* in_end);
 extern int parse_double(const char *str, double *val);
