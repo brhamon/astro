@@ -10,3 +10,11 @@ linux_p1550p2650.440
 novasc3.1.zip
 planets/planets
 tropical/tropical
+
+# con440 build artifacts (con440.c is tracked; its binary and dump are not)
+con440
+con440.out
+
+# CMake build tree and editor config
+/build/
+.vscode/
