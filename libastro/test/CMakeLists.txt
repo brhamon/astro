@@ -53,7 +53,7 @@ endif()
 
 # --- Test executables --------------------------------------------------------
 foreach(t ephemeris replay constants place star nutation hor time ecl tropical
-          horizon)
+          horizon apsides)
   add_executable(test_${t} unit/test_${t}.cpp)
   target_link_libraries(test_${t} PRIVATE astro::astro)
 endforeach()
@@ -63,6 +63,7 @@ add_test(NAME ephemeris COMMAND test_ephemeris)
 # Phenomena: invariants/self-consistency (no NOVAS oracle); need the ephemeris.
 add_test(NAME tropical COMMAND test_tropical)
 add_test(NAME horizon COMMAND test_horizon)
+add_test(NAME apsides COMMAND test_apsides)
 
 # --- Oracle-backed numeric tests: regenerate if possible, else golden --------
 # each: gen target, regenerated CSV, golden CSV, fixture name
@@ -119,5 +120,5 @@ endif()
 # Tests that open the ephemeris need its path.
 if(EXISTS "${_jpleph}")
   set_tests_properties(ephemeris replay constants place star tropical horizon
-    PROPERTIES ENVIRONMENT "LIBASTRO_EPHEMERIS=${_jpleph}")
+    apsides PROPERTIES ENVIRONMENT "LIBASTRO_EPHEMERIS=${_jpleph}")
 endif()

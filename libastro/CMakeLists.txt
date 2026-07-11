@@ -14,6 +14,13 @@ endif()
 
 option(LIBASTRO_BUILD_TESTS "Build libastro tests" ${PROJECT_IS_TOP_LEVEL})
 option(LIBASTRO_BUILD_EXAMPLES "Build libastro examples" ${PROJECT_IS_TOP_LEVEL})
+option(LIBASTRO_BUILD_CLI "Build the astro command-line tool" ${PROJECT_IS_TOP_LEVEL})
+
+# Vendored header-only argument parser (p-ranav/argparse, MIT) for the CLI.
+add_library(argparse INTERFACE)
+add_library(astro::argparse ALIAS argparse)
+target_include_directories(argparse INTERFACE
+  "${CMAKE_CURRENT_SOURCE_DIR}/third_party")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(mdspan)
@@ -46,4 +53,8 @@ endif()
 
 if(LIBASTRO_BUILD_EXAMPLES)
   add_subdirectory(examples)
+endif()
+
+if(LIBASTRO_BUILD_CLI)
+  add_subdirectory(cli)
 endif()

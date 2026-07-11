@@ -15,6 +15,7 @@ namespace {
 constexpr double kT0 = 2451545.0;
 constexpr double kDeg2Rad = 0.017453292519943296;
 constexpr double kRad2Deg = 57.295779513082321;
+constexpr double kTwoPi = 6.283185307179586476925287;
 
 // Fold an angle difference into (-180, 180] degrees.
 double fold180(double x) {
@@ -236,6 +237,84 @@ std::generator<SkyEvent> horizon_events(const Ephemeris& eph, Point body,
     for (int i = 0; i < n; ++i) co_yield event_at(et[i], ek[i]);
 
     t0 = t1; alt0 = alt1; mer0 = mer1;
+  }
+}
+
+namespace {
+
+// GM of the apsis center, in AU^3/day^2, from the ephemeris constant block.
+double gm_center(const Ephemeris& eph, Point center) {
+  const auto& c = eph.constants();
+  if (center == Point::earth) {
+    const auto gmb = c.get("GMB");        // Earth-Moon barycenter GM
+    const auto emrat = c.get("EMRAT");    // M_earth / M_moon
+    if (gmb && emrat) return *gmb * (*emrat) / (*emrat + 1.0);  // Earth's share
+    return 8.887e-10;
+  }
+  return c.get("GMS").value_or(2.9591220828411951e-4);  // Sun (default)
+}
+
+}  // namespace
+
+std::generator<ApsisEvent> apsides(const Ephemeris& eph, Point body,
+                                   Point center, TtInstant start,
+                                   Direction dir) {
+  if (body == center) co_return;
+  const double sign = (dir == Direction::forward) ? 1.0 : -1.0;
+
+  // Radial velocity r.v of body relative to center (AU^2/day); apsis at r.v = 0.
+  // Optionally reports the distance |r|.
+  auto rv = [&](double jd_tdb, double* dist) -> double {
+    auto st = eph.state(body, center, TdbInstant{JulianDate{jd_tdb}}, Units::au);
+    if (!st) {
+      if (dist) *dist = std::numeric_limits<double>::quiet_NaN();
+      return std::numeric_limits<double>::quiet_NaN();
+    }
+    const auto& p = st->position;
+    const auto& v = st->velocity;
+    if (dist) *dist = std::sqrt(p[0] * p[0] + p[1] * p[1] + p[2] * p[2]);
+    return p[0] * v[0] + p[1] * v[1] + p[2] * v[2];
+  };
+
+  double t = tdb_from_tt(start).jd.value();
+
+  // Estimate the orbital period (vis-viva) to size the march stride.
+  auto st0 = eph.state(body, center, TdbInstant{JulianDate{t}}, Units::au);
+  if (!st0) co_return;
+  const double r = std::sqrt(st0->position[0] * st0->position[0] +
+                             st0->position[1] * st0->position[1] +
+                             st0->position[2] * st0->position[2]);
+  const double v2 = st0->velocity[0] * st0->velocity[0] +
+                    st0->velocity[1] * st0->velocity[1] +
+                    st0->velocity[2] * st0->velocity[2];
+  const double gm = gm_center(eph, center);
+  const double inv_a = 2.0 / r - v2 / gm;  // 1 / semi-major axis
+  const double period =
+      (inv_a > 0.0) ? kTwoPi * std::sqrt(std::pow(1.0 / inv_a, 3.0) / gm)
+                    : 3652.5;  // fallback ~10 yr for a non-elliptical fit
+  const double stride = sign * period / 12.0;
+
+  double g0 = rv(t, nullptr);
+  if (std::isnan(g0)) co_return;
+  for (;;) {
+    const double t1 = t + stride;
+    const double g1 = rv(t1, nullptr);
+    if (std::isnan(g1)) co_return;
+    if (g0 * g1 < 0.0) {  // radial velocity changed sign -> apsis
+      double te, tl, ge, gl;
+      if (t < t1) { te = t; tl = t1; ge = g0; gl = g1; }
+      else { te = t1; tl = t; ge = g1; gl = g0; }
+      const double root =
+          brent([&](double x) { return rv(x, nullptr); }, te, tl, ge, gl, 1e-6);
+      double dist = 0.0;
+      rv(root, &dist);
+      // r.v ascending through 0 (- -> +) = periapsis (distance minimum).
+      const Apsis kind = (gl > ge) ? Apsis::periapsis : Apsis::apoapsis;
+      const double tt_jd = root - tdb_minus_tt_seconds(root) / 86400.0;
+      co_yield ApsisEvent{kind, TtInstant{JulianDate{tt_jd}}, dist};
+    }
+    t = t1;
+    g0 = g1;
   }
 }
 

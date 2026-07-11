@@ -81,6 +81,24 @@ std::generator<SkyEvent> horizon_events(
     TtInstant start, Horizon horizon = Horizon::star,
     Direction dir = Direction::forward, DeltaT dt = {});
 
+// --- Apsides (perihelion/aphelion, perigee/apogee) -------------------------
+// Distance extrema of `body` relative to `center`: periapsis (closest) and
+// apoapsis (farthest). A planet about the Sun gives perihelion/aphelion; the
+// Moon about the Earth gives perigee/apogee. An apsis is exactly where the
+// radial velocity r.v = 0 -- read straight from the ephemeris state (position
+// and velocity), with no observer reduction. Supported centers: Sun, Earth.
+enum class Apsis { periapsis, apoapsis };
+
+struct ApsisEvent {
+  Apsis kind;
+  TtInstant time;
+  double distance_au;
+};
+
+std::generator<ApsisEvent> apsides(const Ephemeris& eph, Point body,
+                                   Point center, TtInstant start,
+                                   Direction dir = Direction::forward);
+
 }  // namespace astro
 
 #endif  // ASTRO_PHENOMENA_HPP
