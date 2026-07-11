@@ -118,7 +118,7 @@ int find_moments(double cur_jd, moment_t* outs, int outs_sz)
     int nbr_of_outs=0;
 
     hint.lb = cur_jd - (sidereal_year_in_days * 0.5 + DBL_EPSILON);
-    hint.ub = cur_jd + (sidereal_year_in_days * 1.0 + DBL_EPSILON);
+    hint.ub = cur_jd + (sidereal_year_in_days * 1.01 + DBL_EPSILON);
 
     nbr_of_roots = bracket_roots(subsolar_latitude, &hint, NELTS(ranges), ranges,
             NELTS(ranges));
@@ -248,6 +248,7 @@ int main(void) {
     cat_entry dummy_star;
     short int error = 0;
     char ttl[85];
+    char tmp_name[SIZE_OF_OBJ_NAME];
 
     char workpath[PATH_MAX];
     get_ephfilename(workpath, sizeof(workpath), 1);
@@ -264,7 +265,8 @@ int main(void) {
 
     printf("Ephemeris: %s\n", ttl);
 
-    make_cat_entry("DUMMY","xxx", 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &dummy_star);
+    strcpy(tmp_name, "DUMMY");
+    make_cat_entry(tmp_name,"xxx", 0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, &dummy_star);
 
     if ((error = make_object(0, the_planets[9].id, (char*)the_planets[9].name,
 		    &dummy_star, &sol)) != 0) {
