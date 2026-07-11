@@ -6,8 +6,8 @@
  * these; same algorithm + constants => agreement to round-off (research doc 3.5).
  *
  * Coordinate systems emitted are those libastro implements:
- *   0 = GCRS, 1 = true equator & equinox of date (apparent), 3 = astrometric.
- * Observers: geocenter and two surface sites.
+ *   0 = GCRS, 1 = equator & equinox of date (apparent), 2 = equator & CIO of
+ *   date, 3 = astrometric. Observers: geocenter and two surface sites.
  *
  * Usage:
  *   gen_place <path-to-ephemeris> [out.csv]      (stdout if out.csv omitted)
@@ -62,7 +62,7 @@ int main(int argc, char** argv) {
       {10, "Sun"},    {11, "Moon"}};
   const int n_bodies = (int)(sizeof(bodies) / sizeof(bodies[0]));
 
-  const short coord_systems[] = {0, 1, 3};  /* GCRS, apparent, astrometric */
+  const short coord_systems[] = {0, 1, 2, 3};
   const short accuracies[] = {0, 1};        /* full, reduced */
 
   const struct site sites[] = {

@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   }
 
   const int n_stars = (int)(sizeof(stars) / sizeof(stars[0]));
-  const short coord_systems[] = {0, 1, 3};
+  const short coord_systems[] = {0, 1, 2, 3};
   const short accuracies[] = {0, 1};
   const struct site sites[] = {{0, 0.0, 0.0, 0.0, 0.0},
                                {1, 40.0, -105.0, 1650.0, 69.184}};

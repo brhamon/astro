@@ -48,6 +48,13 @@ struct Star {
   double radial_velocity_km_s = 0.0;
 };
 
+// Distance to a star inferred from its parallax, in AU (1 / sin(parallax)).
+// place() leaves SkyPos::distance_au at 0 for stars (as NOVAS does, since a
+// star's distance is not part of the astrometric place); this is the display
+// convenience a table like the planets demo wants. A non-positive parallax is
+// treated as ~1 gigaparsec, matching starvectors.
+double parallax_distance_au(const Star& star);
+
 // Apparent place of a solar-system body (research doc 2.2). Analogue of
 // NOVAS `sky_pos`.
 struct SkyPos {
@@ -68,14 +75,15 @@ struct SkyPos {
 //   - object: major planet, Pluto, Sun, or Moon (not Earth), or a `Star`;
 //   - observer: geocenter and Earth surface;
 //   - coord_sys: `gcrs` (light deflection + aberration), `astrometric`
-//     (neither), and `equator_equinox` (apparent place of date: + frame tie,
-//     precession, nutation);
+//     (neither), `equator_equinox` (apparent place of date: + frame tie,
+//     precession, nutation), and `equator_cio` (equator & CIO of date, via the
+//     analytic celestial-intermediate basis -- no CIO data file needed);
 //   - accuracy: `full` (IAU 2000A nutation, Sun+Jupiter+Saturn deflection) and
 //     `reduced` (NU2000K nutation, Sun-only deflection);
 //   - `SkyPos::radial_velocity_km_s` is computed (rad_vel); `distance_au` is 0
 //     for a star.
 //
-// Pending (return `EphError::not_implemented`): the `equator_cio` CIO system.
+// All four coordinate systems and both object kinds are implemented.
 std::expected<SkyPos, EphError> place(
     const Ephemeris& eph, Point body, TtInstant t, DeltaT dt,
     CoordSys sys, Accuracy accuracy);

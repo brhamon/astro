@@ -17,9 +17,10 @@ generators in `test/gen/` are the oracles; see `test/`).
 - **Earth orientation** — IAU 2000A / NU2000K nutation, mean obliquity,
   fundamental arguments, precession, frame tie, sidereal time. ✅
 - **Layer 2 `place()`** — solar-system bodies *and* stars (proper motion /
-  parallax); geocentric & surface observers; `gcrs`, `astrometric`, and
-  `equator_equinox` (apparent of date); full & reduced accuracy; radial
-  velocity (`rad_vel`). ✅
+  parallax); geocentric & surface observers; all four coordinate systems
+  (`gcrs`, `astrometric`, `equator_equinox` apparent-of-date, `equator_cio`
+  equator & CIO of date); full & reduced accuracy; radial velocity
+  (`rad_vel`). ✅
 - **`equ2hor`** — apparent RA/Dec → local zenith distance / azimuth, with polar
   motion and refraction. ✅
 - **Civil time** — calendar ⇄ Julian date, leap seconds, and UTC → {TT, UT1,
@@ -28,7 +29,8 @@ generators in `test/gen/` are the oracles; see `test/`).
   public API (`utc_time_scales` → `place` → `equ2hor`), reproducing the legacy
   `planets` core including its Polaris line. ✅
 
-Not yet: `place()` CIO system (`equator_cio`).
+`place()` now covers the full NOVAS coordinate/object surface. Remaining
+niceties: library packaging (install / export / `find_package`).
 
 ## Relationship to the legacy C code
 
@@ -52,29 +54,84 @@ extracts it with history into a standalone repo.
 
 ## Prerequisites
 
-- The flake toolchain: `nix develop` (Clang 22 + GCC 15 libstdc++, CMake, Ninja, curl).
-- One-time vendoring of `std::mdspan` and one-time ephemeris download.
+Just a C++23 toolchain and CMake — Nix is **optional**:
+
+- A C++23 compiler: **GCC 15+**, or a recent Clang (17+) with a C++23 standard
+  library. (Builds natively wherever one is installed — e.g. a system GCC 15.)
+- CMake 3.28+ and a generator (Ninja or Make).
+- `std::mdspan`: used via a native `<mdspan>` if the toolchain has one, else the
+  vendored Kokkos reference impl (`scripts/vendor_mdspan.sh`) or, failing that,
+  CMake `FetchContent` at configure time (needs network once).
+- `curl` for the one-time ephemeris download.
+
+The bundled **`flake.nix`** is a convenience: `nix develop` drops you into a
+known-good toolchain (Clang 22 + GCC 15 libstdc++, CMake, Ninja, curl) so you
+don't have to assemble one. It is not required to build.
 
 ## Quick start
 
+With your own toolchain (no Nix):
+
 ```sh
-nix develop
-./scripts/vendor_mdspan.sh          # fetch Kokkos reference std::mdspan into third_party/
+./scripts/vendor_mdspan.sh          # only if <mdspan> is absent and you want to avoid FetchContent
 ./scripts/fetch_ephemeris.sh        # curl the DE440 binary into data/ (verifies sha256)
-cmake -B build -G Ninja
+cmake -B build                      # add -G Ninja if you prefer Ninja
 cmake --build build
 ctest --test-dir build
 ./build/examples/planets 2025 6 21 20.0   # civil UTC date -> RA/Dec + Alt/Az table
 ```
 
+Prefer the pinned toolchain? Prefix with `nix develop` (or run the above inside
+`nix develop`).
+
 Point the library at the ephemeris via the `LIBASTRO_EPHEMERIS` env var or by
 passing the path to `astro::Ephemeris::open(...)`. `scripts/fetch_ephemeris.sh`
 writes to `data/JPLEPH` by default.
 
+## Verifying the results
+
+libastro is validated against **NOVAS-C**, the U.S. Naval Observatory's reference
+implementation: the test suite compares libastro's output to NOVAS-C's for
+ephemeris state, the `place()` reductions (all coordinate systems, bodies and
+stars), nutation, `equ2hor`, the named constants, and calendar conversions. So
+"is libastro correct?" reduces to "does it match NOVAS-C?" — which you can check
+two ways, depending on what you want to know. Comparisons are tolerance-based
+(far below any physical significance), so platform round-off differences are
+fine.
+
+**"Does it work in my build?" — the default (no NOVAS needed).**
+`ctest` replays a small committed slice of NOVAS-C reference values
+(`test/vectors/golden_*.csv`) through your build. A pass means your
+toolchain/platform computes the right numbers. Fetch the ephemeris first so the
+state/place/star checks can run (`scripts/fetch_ephemeris.sh`); the nutation,
+`equ2hor`, and time checks need nothing extra.
+
+```sh
+./scripts/fetch_ephemeris.sh
+cmake -B build && cmake --build build
+ctest --test-dir build          # replays the committed golden vectors
+```
+
+**"Prove it to me" — independent, full-range equivalence.**
+Don't trust the committed numbers? Build NOVAS-C yourself and let CTest
+regenerate the references from *your* NOVAS across the **entire** DE440 span,
+then replay them. A zero residual means libastro reproduces NOVAS-C exactly on
+your machine — no trust in this repo required.
+
+```sh
+( cd .. && make )               # fetches + patches + builds NOVAS-C -> novasc3.1/novas.a
+cmake -B build && cmake --build build
+ctest --test-dir build          # fixtures now regenerate full-range refs and replay
+```
+
+When `novas.a` is present the fixtures regenerate; otherwise the same tests fall
+back to the golden slice. See `test/gen/README.md` for the oracle mechanics and
+how to refresh the golden files.
+
 ## Layout
 
 ```
-flake.nix                 own toolchain (does not touch the legacy build)
+flake.nix                 optional pinned toolchain (nix develop); not required
 CMakeLists.txt            library target `astro` + optional tests
 cmake/                    helper modules (mdspan resolution)
 third_party/mdspan/       vendored Kokkos std::mdspan (via scripts/vendor_mdspan.sh)
@@ -86,7 +143,7 @@ scripts/                  fetch_ephemeris.sh, vendor_mdspan.sh
 data/                     fetched ephemeris (gitignored)
 test/
   gen/                    oracle generators (gen_vectors: novas.a; gen_constants: con440.c)
-  vectors/                committed reference vectors only (e.g. USNO checkout files)
+  vectors/                committed golden vectors (NOVAS-free build-sanity tier)
   unit/                   unit tests; oracle CSVs regenerated into the build tree
 ```
 
