@@ -28,6 +28,35 @@ even without the fixture.
 
 So the normal workflow is just `ctest` — no manual generation, no `git add`.
 
+## Golden vectors (committed, NOVAS-free)
+
+When NOVAS is *not* built, the numeric tests can't regenerate, so they instead
+replay a small committed slice of NOVAS-C reference values in `../vectors/`:
+
+```
+golden_state_de440.csv   golden_place_de440.csv   golden_star_de440.csv
+golden_nutation.csv      golden_hor.csv
+```
+
+These let anyone run `ctest` and confirm their build computes the right numbers
+without touching NOVAS (build-sanity tier in the top-level README). They are a
+representative slice — small on purpose — not the full-range regeneration. The
+`_de440` files are DE440-specific; `golden_nutation`/`golden_hor` are pure
+functions of time/geometry.
+
+Refresh them only when the models or the reference change, from a NOVAS build
+(sampling header + every Kth row to stay small):
+
+```sh
+cmake --build build                                   # builds the gen_* tools
+B=build/test
+$B/gen_vectors  data/JPLEPH | awk 'NR==1||NR%100==0' > test/vectors/golden_state_de440.csv
+$B/gen_place    data/JPLEPH | awk 'NR==1||NR%50==0'  > test/vectors/golden_place_de440.csv
+$B/gen_star     data/JPLEPH | awk 'NR==1||NR%10==0'  > test/vectors/golden_star_de440.csv
+$B/gen_nutation             | awk 'NR==1||NR%10==0'  > test/vectors/golden_nutation.csv
+$B/gen_hor                  | awk 'NR==1||NR%20==0'  > test/vectors/golden_hor.csv
+```
+
 ## Prerequisites
 
 `gen_vectors` needs the legacy NOVAS-C archive; build it once in the parent repo

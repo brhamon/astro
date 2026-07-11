@@ -88,6 +88,46 @@ Point the library at the ephemeris via the `LIBASTRO_EPHEMERIS` env var or by
 passing the path to `astro::Ephemeris::open(...)`. `scripts/fetch_ephemeris.sh`
 writes to `data/JPLEPH` by default.
 
+## Verifying the results
+
+libastro is validated against **NOVAS-C**, the U.S. Naval Observatory's reference
+implementation: the test suite compares libastro's output to NOVAS-C's for
+ephemeris state, the `place()` reductions (all coordinate systems, bodies and
+stars), nutation, `equ2hor`, the named constants, and calendar conversions. So
+"is libastro correct?" reduces to "does it match NOVAS-C?" — which you can check
+two ways, depending on what you want to know. Comparisons are tolerance-based
+(far below any physical significance), so platform round-off differences are
+fine.
+
+**"Does it work in my build?" — the default (no NOVAS needed).**
+`ctest` replays a small committed slice of NOVAS-C reference values
+(`test/vectors/golden_*.csv`) through your build. A pass means your
+toolchain/platform computes the right numbers. Fetch the ephemeris first so the
+state/place/star checks can run (`scripts/fetch_ephemeris.sh`); the nutation,
+`equ2hor`, and time checks need nothing extra.
+
+```sh
+./scripts/fetch_ephemeris.sh
+cmake -B build && cmake --build build
+ctest --test-dir build          # replays the committed golden vectors
+```
+
+**"Prove it to me" — independent, full-range equivalence.**
+Don't trust the committed numbers? Build NOVAS-C yourself and let CTest
+regenerate the references from *your* NOVAS across the **entire** DE440 span,
+then replay them. A zero residual means libastro reproduces NOVAS-C exactly on
+your machine — no trust in this repo required.
+
+```sh
+( cd .. && make )               # fetches + patches + builds NOVAS-C -> novasc3.1/novas.a
+cmake -B build && cmake --build build
+ctest --test-dir build          # fixtures now regenerate full-range refs and replay
+```
+
+When `novas.a` is present the fixtures regenerate; otherwise the same tests fall
+back to the golden slice. See `test/gen/README.md` for the oracle mechanics and
+how to refresh the golden files.
+
 ## Layout
 
 ```
@@ -103,7 +143,7 @@ scripts/                  fetch_ephemeris.sh, vendor_mdspan.sh
 data/                     fetched ephemeris (gitignored)
 test/
   gen/                    oracle generators (gen_vectors: novas.a; gen_constants: con440.c)
-  vectors/                committed reference vectors only (e.g. USNO checkout files)
+  vectors/                committed golden vectors (NOVAS-free build-sanity tier)
   unit/                   unit tests; oracle CSVs regenerated into the build tree
 ```
 
