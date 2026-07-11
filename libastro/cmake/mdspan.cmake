@@ -38,6 +38,9 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/kokkos/mdspan.git
   GIT_TAG stable
   GIT_SHALLOW TRUE
+  # EXCLUDE_FROM_ALL keeps mdspan's own install() rules out of our install tree:
+  # it is a build-only private dependency (see the BUILD_INTERFACE link below).
+  EXCLUDE_FROM_ALL SYSTEM
 )
 FetchContent_MakeAvailable(mdspan)
 target_link_libraries(astro_mdspan INTERFACE mdspan)

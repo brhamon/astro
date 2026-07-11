@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+# libastro has no public dependencies: std::mdspan is a build-only private
+# implementation detail (not referenced by any installed header), and argparse
+# is used only by the CLI. So the exported target needs nothing beyond itself.
+include("${CMAKE_CURRENT_LIST_DIR}/astroTargets.cmake")
+
+check_required_components(astro)

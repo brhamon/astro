@@ -45,9 +45,13 @@ generators in `test/gen/` are the oracles; see `test/`).
   `place`, `sky`, `rise`, `seasons`, `apsides`, `time`, `constant`, `info`),
   built on a vendored header-only argument parser (`third_party/argparse`). ✅
 
-`place()` covers the full NOVAS coordinate/object surface, and the phenomena
-layer is in. Remaining niceties: library packaging (install / export /
-`find_package`).
+- **Packaging** — installs as a CMake package: `find_package(astro CONFIG)`
+  gives you the `astro::astro` target (see
+  [Installing](#installing-and-using-from-another-project)). ✅
+
+`place()` covers the full NOVAS coordinate/object surface, the phenomena layer
+is in, and the library installs as a consumable CMake package. The one remaining
+follow-up is flipping the build to C++ modules (`import std;`, see the end).
 
 ## Relationship to the legacy C code
 
@@ -110,6 +114,33 @@ Prefer the pinned toolchain? Prefix with `nix develop` (or run the above inside
 Point the library at the ephemeris via the `LIBASTRO_EPHEMERIS` env var or by
 passing the path to `astro::Ephemeris::open(...)`. `scripts/fetch_ephemeris.sh`
 writes to `data/JPLEPH` by default.
+
+## Installing and using from another project
+
+libastro installs as a relocatable CMake package, so a downstream project just
+does `find_package` and links one target:
+
+```sh
+cmake -B build && cmake --build build
+cmake --install build --prefix /path/to/prefix
+```
+
+The install tree is self-contained — headers under `include/astro/`, the static
+`libastro.a`, the `astro` CLI, and the package files under
+`lib/cmake/astro/`. `std::mdspan` is a build-only private dependency (no public
+header includes it), so it is **not** installed and consumers need nothing but
+libastro:
+
+```cmake
+find_package(astro CONFIG REQUIRED)
+target_link_libraries(my_app PRIVATE astro::astro)   # headers + link, done
+```
+
+Point CMake at the prefix with `-DCMAKE_PREFIX_PATH=/path/to/prefix` if it isn't
+a system location. To embed libastro directly instead of installing, either
+`add_subdirectory(libastro)` (the `LIBASTRO_BUILD_*` / `LIBASTRO_INSTALL`
+options default off for a non-top-level build) or `FetchContent` this repo — the
+same `astro::astro` target results.
 
 ## Verifying the results
 
