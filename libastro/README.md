@@ -54,20 +54,35 @@ extracts it with history into a standalone repo.
 
 ## Prerequisites
 
-- The flake toolchain: `nix develop` (Clang 22 + GCC 15 libstdc++, CMake, Ninja, curl).
-- One-time vendoring of `std::mdspan` and one-time ephemeris download.
+Just a C++23 toolchain and CMake — Nix is **optional**:
+
+- A C++23 compiler: **GCC 15+**, or a recent Clang (17+) with a C++23 standard
+  library. (Builds natively wherever one is installed — e.g. a system GCC 15.)
+- CMake 3.28+ and a generator (Ninja or Make).
+- `std::mdspan`: used via a native `<mdspan>` if the toolchain has one, else the
+  vendored Kokkos reference impl (`scripts/vendor_mdspan.sh`) or, failing that,
+  CMake `FetchContent` at configure time (needs network once).
+- `curl` for the one-time ephemeris download.
+
+The bundled **`flake.nix`** is a convenience: `nix develop` drops you into a
+known-good toolchain (Clang 22 + GCC 15 libstdc++, CMake, Ninja, curl) so you
+don't have to assemble one. It is not required to build.
 
 ## Quick start
 
+With your own toolchain (no Nix):
+
 ```sh
-nix develop
-./scripts/vendor_mdspan.sh          # fetch Kokkos reference std::mdspan into third_party/
+./scripts/vendor_mdspan.sh          # only if <mdspan> is absent and you want to avoid FetchContent
 ./scripts/fetch_ephemeris.sh        # curl the DE440 binary into data/ (verifies sha256)
-cmake -B build -G Ninja
+cmake -B build                      # add -G Ninja if you prefer Ninja
 cmake --build build
 ctest --test-dir build
 ./build/examples/planets 2025 6 21 20.0   # civil UTC date -> RA/Dec + Alt/Az table
 ```
+
+Prefer the pinned toolchain? Prefix with `nix develop` (or run the above inside
+`nix develop`).
 
 Point the library at the ephemeris via the `LIBASTRO_EPHEMERIS` env var or by
 passing the path to `astro::Ephemeris::open(...)`. `scripts/fetch_ephemeris.sh`
@@ -76,7 +91,7 @@ writes to `data/JPLEPH` by default.
 ## Layout
 
 ```
-flake.nix                 own toolchain (does not touch the legacy build)
+flake.nix                 optional pinned toolchain (nix develop); not required
 CMakeLists.txt            library target `astro` + optional tests
 cmake/                    helper modules (mdspan resolution)
 third_party/mdspan/       vendored Kokkos std::mdspan (via scripts/vendor_mdspan.sh)
