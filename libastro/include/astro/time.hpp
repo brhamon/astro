@@ -48,6 +48,13 @@ TimeScaleSet utc_time_scales(double jd_utc, double ut1_utc = 0.0);
 TimeScaleSet utc_time_scales(int year, int month, int day, double hour,
                              double ut1_utc = 0.0);
 
+// TDB - TT, in seconds, at TT Julian date `jd_tt` (the periodic relativistic
+// term; USNO Circular 179 eq. 2.6). |TDB - TT| stays under ~2 ms.
+double tdb_minus_tt_seconds(double jd_tt);
+
+// Convert TT to TDB (the ephemeris time scale) using the term above.
+TdbInstant tdb_from_tt(TtInstant t);
+
 }  // namespace astro
 
 #endif  // ASTRO_TIME_HPP

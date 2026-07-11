@@ -890,6 +890,12 @@ double parallax_distance_au(const Star& star) {
   return 1.0 / std::sin(p * 1.0e-3 * kAsec2Rad);
 }
 
+double greenwich_apparent_sidereal_time(Ut1Instant t, DeltaT dt,
+                                        Accuracy accuracy) {
+  return sidereal_time_hours(t.jd.whole, t.jd.frac, dt.seconds,
+                             /*apparent=*/true, accuracy);
+}
+
 HorizonPos equ2hor(Ut1Instant t, DeltaT dt, Accuracy accuracy, PolarMotion pole,
                    const SurfaceObserver& obs, double ra_hours, double dec_deg,
                    Refraction refraction) {

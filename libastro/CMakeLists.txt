@@ -21,6 +21,7 @@ include(mdspan)
 add_library(astro
   src/ephemeris.cpp
   src/nutation.cpp
+  src/phenomena.cpp
   src/reductions.cpp
   src/time.cpp
 )

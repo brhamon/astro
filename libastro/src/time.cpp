@@ -86,4 +86,20 @@ TimeScaleSet utc_time_scales(int year, int month, int day, double hour,
   return utc_time_scales(julian_date(year, month, day, hour), ut1_utc);
 }
 
+double tdb_minus_tt_seconds(double jd_tt) {
+  const double t = (jd_tt - 2451545.0) / 36525.0;
+  return 0.001657 * std::sin(628.3076 * t + 6.2401) +
+         0.000022 * std::sin(575.3385 * t + 4.2970) +
+         0.000014 * std::sin(1256.6152 * t + 6.1969) +
+         0.000005 * std::sin(606.9777 * t + 4.0212) +
+         0.000005 * std::sin(52.9691 * t + 0.4444) +
+         0.000002 * std::sin(21.3299 * t + 5.5431) +
+         0.000010 * t * std::sin(628.3076 * t + 4.2490);
+}
+
+TdbInstant tdb_from_tt(TtInstant t) {
+  const double jd_tt = t.jd.value();
+  return TdbInstant{JulianDate{jd_tt, tdb_minus_tt_seconds(jd_tt) / 86400.0}};
+}
+
 }  // namespace astro
