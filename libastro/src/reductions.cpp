@@ -26,6 +26,7 @@ constexpr double kCAuDay = 173.1446326846693;
 constexpr double kAu = 1.4959787069098932e11;
 constexpr double kAuKm = 1.4959787069098932e8;
 constexpr double kGs = 1.32712440017987e20;
+constexpr double kGe = 3.98600433e14;   // geocentric GM, m^3/s^2
 constexpr double kErad = 6378136.6;
 constexpr double kFlattening = 0.003352819697896;
 constexpr double kAngvel = 7.2921150e-5;
@@ -46,6 +47,10 @@ double vlen(const double v[3]) {
 }
 double dot3(const double a[3], const double b[3]) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+}
+double dist3(const double a[3], const double b[3]) {
+  const double d[3] = {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
+  return vlen(d);
 }
 double norm_ang(double angle) {
   double a = std::fmod(angle, kTwoPi);
@@ -610,19 +615,119 @@ double refract_zd(const SurfaceObserver& loc, Refraction ref, double zd_obs) {
   return r * (0.28 * p / (t + 273.0));
 }
 
+// Apply space motion to a star's position over an interval (novas.c:proper_motion).
+void proper_motion(double jd1, const double pos[3], const double vel[3],
+                   double jd2, double pos2[3]) {
+  for (int j = 0; j < 3; ++j) pos2[j] = pos[j] + vel[j] * (jd2 - jd1);
+}
+
+// Star catalog data -> barycentric ICRS position (AU) and velocity (AU/day),
+// including the Doppler factor for radial motion (novas.c:starvectors).
+void starvectors(const Star& star, double pos[3], double vel[3]) {
+  double paralx = star.parallax_mas;
+  if (paralx <= 0.0) paralx = 1.0e-6;  // ~1 gigaparsec
+
+  const double dist = 1.0 / std::sin(paralx * 1.0e-3 * kAsec2Rad);
+  const double r = star.ra_hours * 15.0 * kDeg2Rad;
+  const double d = star.dec_deg * kDeg2Rad;
+  const double cra = std::cos(r), sra = std::sin(r);
+  const double cdc = std::cos(d), sdc = std::sin(d);
+
+  pos[0] = dist * cdc * cra;
+  pos[1] = dist * cdc * sra;
+  pos[2] = dist * sdc;
+
+  const double k = 1.0 / (1.0 - star.radial_velocity_km_s / kC * 1000.0);
+  const double pmr = star.pm_ra_mas_yr / (paralx * 365.25) * k;
+  const double pmd = star.pm_dec_mas_yr / (paralx * 365.25) * k;
+  const double rvl = star.radial_velocity_km_s * 86400.0 / kAuKm * k;
+
+  vel[0] = -pmr * sra - pmd * sdc * cra + rvl * cdc * cra;
+  vel[1] = pmr * cra - pmd * sdc * sra + rvl * cdc * sra;
+  vel[2] = pmd * cdc + rvl * sdc;
+}
+
+// Observed radial velocity measure * c, in km/s (novas.c:rad_vel). `pos` is the
+// light-time-corrected object position wrt observer; `vel` the object's
+// barycentric velocity; distances in AU.
+double radial_velocity(bool is_star, double star_ra, double star_dec,
+                       double star_parallax, double star_rv,
+                       const double pos[3], const double vel_in[3],
+                       const double vel_obs[3], double d_obs_geo,
+                       double d_obs_sun, double d_obj_sun) {
+  const double c2 = kC * kC;
+  const double toms = kAu / 86400.0;
+  const double toms2 = toms * toms;
+
+  double v[3] = {vel_in[0], vel_in[1], vel_in[2]};
+  double ra = 0.0, dec = 0.0, radvel = 0.0;
+  if (is_star) {
+    ra = star_ra;
+    dec = star_dec;
+    radvel = star_rv;
+    if (star_parallax <= 0.0)
+      for (int i = 0; i < 3; ++i) v[i] = 0.0;
+  }
+
+  const double posmag = vlen(pos);
+  const double uk[3] = {pos[0] / posmag, pos[1] / posmag, pos[2] / posmag};
+  const double v2 = dot3(v, v) * toms2;
+  const double vo2 = dot3(vel_obs, vel_obs) * toms2;
+
+  double r = d_obs_geo * kAu;
+  const double phigeo = (r > 1.0e6) ? kGe / r : 0.0;
+  r = d_obs_sun * kAu;
+  double phisun = (r > 1.0e8) ? kGs / r : 0.0;
+
+  double rel;
+  if (d_obs_geo != 0.0 || d_obs_sun != 0.0)
+    rel = 1.0 - (phigeo + phisun) / c2 - 0.5 * vo2 / c2;
+  else
+    rel = 1.0 - 1.550e-8;
+
+  double zb1, kvobs, zobs1;
+  if (is_star) {
+    const double rar = ra * 15.0 * kDeg2Rad, dcr = dec * kDeg2Rad;
+    const double cosdec = std::cos(dcr);
+    const double du[3] = {uk[0] - cosdec * std::cos(rar),
+                          uk[1] - cosdec * std::sin(rar), uk[2] - std::sin(dcr)};
+    const double zc = radvel * 1.0e3 + dot3(v, du) * toms;
+    zb1 = 1.0 + zc / kC;
+    kvobs = dot3(uk, vel_obs) * toms;
+    zobs1 = zb1 * rel / (1.0 + kvobs / kC);
+  } else {
+    r = d_obj_sun * kAu;
+    phisun = (r > 1.0e8 && r < 1.0e16) ? kGs / r : 0.0;
+    const double kv = dot3(uk, vel_in) * toms;
+    zb1 = (1.0 + kv / kC) / (1.0 - phisun / c2 - 0.5 * v2 / c2);
+    kvobs = dot3(uk, vel_obs) * toms;
+    zobs1 = zb1 * rel / (1.0 + kvobs / kC);
+  }
+  return (zobs1 - 1.0) * kC / 1000.0;
+}
+
 // -------------------- place() core ------------------------------------------
 
-std::expected<SkyPos, EphError> place_impl(const Ephemeris& eph, Point body,
-                                           double jd_tt, double delta_t,
-                                           bool surface,
+// Observed object: a solar-system body or a star.
+struct Target {
+  bool is_star = false;
+  Point body = Point::sun;
+  Star star{};
+};
+
+std::expected<SkyPos, EphError> place_impl(const Ephemeris& eph,
+                                           const Target& tgt, double jd_tt,
+                                           double delta_t, bool surface,
                                            const SurfaceObserver& loc,
                                            CoordSys sys, Accuracy accuracy) {
   if (sys == CoordSys::equator_cio)
     return std::unexpected(EphError::not_implemented);
 
-  const int n = static_cast<int>(body);
-  if (n < 0 || n > 10 || body == Point::earth)
-    return std::unexpected(EphError::invalid_argument);
+  if (!tgt.is_star) {
+    const int n = static_cast<int>(tgt.body);
+    if (n < 0 || n > 10 || tgt.body == Point::earth)
+      return std::unexpected(EphError::invalid_argument);
+  }
 
   const bool full = (accuracy == Accuracy::full);
   const double jd_tdb = jd_tt + tdb_minus_tt_seconds(jd_tt) / 86400.0;
@@ -632,7 +737,6 @@ std::expected<SkyPos, EphError> place_impl(const Ephemeris& eph, Point body,
     return std::unexpected(r.error());
   if (auto r = bary_state(eph, Point::sun, jd_tdb, 0.0, psb, vsb); !r)
     return std::unexpected(r.error());
-  (void)psb;  // used by rad_vel (not yet ported)
 
   // Observer geocentric offset.
   double pog[3] = {}, vog[3] = {};
@@ -647,17 +751,26 @@ std::expected<SkyPos, EphError> place_impl(const Ephemeris& eph, Point body,
     vob[i] = veb[i] + vog[i];
   }
 
-  double pos1[3], vel1[3];
-  if (auto r = bary_state(eph, body, jd_tdb, 0.0, pos1, vel1); !r)
-    return std::unexpected(r.error());
-  double pos2[3], t_light0;
-  bary2obs(pos1, pob, pos2, &t_light0);
-  const double dis = t_light0 * kCAuDay;
-
-  double pos3[3];
-  auto tl = light_time(eph, body, pob, jd_tdb, t_light0, full, pos3);
-  if (!tl) return std::unexpected(tl.error());
-  const double t_light = *tl;
+  // Geometric position: pos1 = object barycentric (for d_obj_sun / rad_vel),
+  // vel1 = object barycentric velocity, pos3 = light-time-corrected geocentric.
+  double pos1[3], vel1[3], pos3[3], t_light = 0.0, dis = 0.0;
+  if (tgt.is_star) {
+    starvectors(tgt.star, pos1, vel1);
+    const double dt = d_light(pos1, pob);
+    double pos2[3];
+    proper_motion(kT0, pos1, vel1, jd_tdb + dt, pos2);
+    bary2obs(pos2, pob, pos3, &t_light);
+    dis = 0.0;
+  } else {
+    if (auto r = bary_state(eph, tgt.body, jd_tdb, 0.0, pos1, vel1); !r)
+      return std::unexpected(r.error());
+    double pos2[3], t_light0;
+    bary2obs(pos1, pob, pos2, &t_light0);
+    dis = t_light0 * kCAuDay;
+    auto tl = light_time(eph, tgt.body, pob, jd_tdb, t_light0, full, pos3);
+    if (!tl) return std::unexpected(tl.error());
+    t_light = *tl;
+  }
 
   double pos5[3];
   if (sys == CoordSys::astrometric) {
@@ -680,12 +793,22 @@ std::expected<SkyPos, EphError> place_impl(const Ephemeris& eph, Point body,
     for (int i = 0; i < 3; ++i) pos8[i] = pos5[i];
   }
 
+  // Radial velocity (uses the pre-deflection geocentric position pos3 and the
+  // object's barycentric velocity vel1).
+  const double d_obs_geo = dist3(pob, peb);
+  const double d_obs_sun = dist3(pob, psb);
+  const double d_obj_sun = dist3(pos1, psb);
+  const double rv = radial_velocity(
+      tgt.is_star, tgt.star.ra_hours, tgt.star.dec_deg, tgt.star.parallax_mas,
+      tgt.star.radial_velocity_km_s, pos3, vel1, vob, d_obs_geo, d_obs_sun,
+      d_obj_sun);
+
   SkyPos out;
   vector2radec(pos8, &out.ra_hours, &out.dec_deg);
   out.distance_au = dis;
   const double x = vlen(pos8);
   for (int i = 0; i < 3; ++i) out.r_hat[i] = pos8[i] / x;
-  out.radial_velocity_km_s = 0.0;  // TODO(rad_vel)
+  out.radial_velocity_km_s = rv;
   return out;
 }
 
@@ -695,16 +818,32 @@ std::expected<SkyPos, EphError> place(const Ephemeris& eph, Point body,
                                       TtInstant t, DeltaT dt, CoordSys sys,
                                       Accuracy accuracy) {
   (void)dt;  // geocentric observer: delta_t unused
-  return place_impl(eph, body, t.jd.value(), 0.0, /*surface=*/false,
-                    SurfaceObserver{}, sys, accuracy);
+  return place_impl(eph, Target{false, body, {}}, t.jd.value(), 0.0,
+                    /*surface=*/false, SurfaceObserver{}, sys, accuracy);
 }
 
 std::expected<SkyPos, EphError> place(const Ephemeris& eph, Point body,
                                       TtInstant t, DeltaT dt,
                                       const SurfaceObserver& observer,
                                       CoordSys sys, Accuracy accuracy) {
-  return place_impl(eph, body, t.jd.value(), dt.seconds, /*surface=*/true,
-                    observer, sys, accuracy);
+  return place_impl(eph, Target{false, body, {}}, t.jd.value(), dt.seconds,
+                    /*surface=*/true, observer, sys, accuracy);
+}
+
+std::expected<SkyPos, EphError> place(const Ephemeris& eph, const Star& star,
+                                      TtInstant t, DeltaT dt, CoordSys sys,
+                                      Accuracy accuracy) {
+  (void)dt;  // geocentric observer: delta_t unused
+  return place_impl(eph, Target{true, Point::sun, star}, t.jd.value(), 0.0,
+                    /*surface=*/false, SurfaceObserver{}, sys, accuracy);
+}
+
+std::expected<SkyPos, EphError> place(const Ephemeris& eph, const Star& star,
+                                      TtInstant t, DeltaT dt,
+                                      const SurfaceObserver& observer,
+                                      CoordSys sys, Accuracy accuracy) {
+  return place_impl(eph, Target{true, Point::sun, star}, t.jd.value(),
+                    dt.seconds, /*surface=*/true, observer, sys, accuracy);
 }
 
 HorizonPos equ2hor(Ut1Instant t, DeltaT dt, Accuracy accuracy, PolarMotion pole,

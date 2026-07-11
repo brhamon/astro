@@ -20,6 +20,7 @@ constexpr double kRaTol = 1e-9;    // hours (~5e-5 arcsec)
 constexpr double kDecTol = 1e-8;   // degrees (~3.6e-5 arcsec)
 constexpr double kDisRelTol = 1e-11;
 constexpr double kRhatTol = 1e-11;
+constexpr double kRvTol = 1e-9;    // km/s
 
 // NOVAS object number -> astro::Point.
 astro::Point to_point(int novas_number) {
@@ -59,17 +60,17 @@ int main(int argc, char** argv) {
   std::getline(csv, line);  // header
 
   long rows = 0, failures = 0;
-  double max_ra = 0, max_dec = 0, max_dis_rel = 0, max_rhat = 0;
+  double max_ra = 0, max_dec = 0, max_dis_rel = 0, max_rhat = 0, max_rv = 0;
 
   while (std::getline(csv, line)) {
     if (line.empty()) continue;
     int cs = 0, acc = 0, body = 0, where = 0;
     double lat = 0, lon = 0, height = 0, dt = 0;
-    double jd = 0, ra = 0, dec = 0, dis = 0, rh[3] = {};
+    double jd = 0, ra = 0, dec = 0, dis = 0, rh[3] = {}, rv = 0;
     if (std::sscanf(line.c_str(),
-                    "%d,%d,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf",
+                    "%d,%d,%d,%d,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%lf",
                     &cs, &acc, &body, &where, &lat, &lon, &height, &dt, &jd, &ra,
-                    &dec, &dis, &rh[0], &rh[1], &rh[2]) != 15) {
+                    &dec, &dis, &rh[0], &rh[1], &rh[2], &rv) != 16) {
       std::fprintf(stderr, "FAIL place: malformed row: %s\n", line.c_str());
       ++failures;
       continue;
@@ -104,14 +105,16 @@ int main(int argc, char** argv) {
     double drhat = 0.0;
     for (int i = 0; i < 3; ++i)
       drhat = std::fmax(drhat, std::fabs(sp->r_hat[i] - rh[i]));
+    const double drv = std::fabs(sp->radial_velocity_km_s - rv);
 
     max_ra = std::fmax(max_ra, dra);
     max_dec = std::fmax(max_dec, ddec);
     max_dis_rel = std::fmax(max_dis_rel, ddis);
     max_rhat = std::fmax(max_rhat, drhat);
+    max_rv = std::fmax(max_rv, drv);
 
     if (dra > kRaTol || ddec > kDecTol || ddis > kDisRelTol ||
-        drhat > kRhatTol) {
+        drhat > kRhatTol || drv > kRvTol) {
       std::fprintf(stderr,
                    "FAIL place: mismatch cs=%d acc=%d body=%d jd=%.6f\n"
                    "  got ra=%.12f dec=%.12f dis=%.12f\n"
@@ -124,7 +127,7 @@ int main(int argc, char** argv) {
 
   std::fprintf(stderr,
                "place: %ld rows, %ld failures; max |dra|=%.2e h |ddec|=%.2e deg "
-               "|ddis|/dis=%.2e |drhat|=%.2e\n",
-               rows, failures, max_ra, max_dec, max_dis_rel, max_rhat);
+               "|ddis|/dis=%.2e |drhat|=%.2e |drv|=%.2e km/s\n",
+               rows, failures, max_ra, max_dec, max_dis_rel, max_rhat, max_rv);
   return failures == 0 ? 0 : 1;
 }

@@ -37,6 +37,17 @@ struct SurfaceObserver {
   double pressure_mbar = 1010.0;
 };
 
+// Catalog astrometric data for an object outside the solar system (a star).
+// ICRS. Analogue of the astrometric fields of NOVAS `cat_entry`.
+struct Star {
+  double ra_hours = 0.0;             // ICRS right ascension (hours)
+  double dec_deg = 0.0;              // ICRS declination (degrees)
+  double pm_ra_mas_yr = 0.0;         // proper motion in RA (milliarcsec/yr)
+  double pm_dec_mas_yr = 0.0;        // proper motion in Dec (milliarcsec/yr)
+  double parallax_mas = 0.0;         // parallax (milliarcsec); <= 0 => "far away"
+  double radial_velocity_km_s = 0.0;
+};
+
 // Apparent place of a solar-system body (research doc 2.2). Analogue of
 // NOVAS `sky_pos`.
 struct SkyPos {
@@ -52,24 +63,33 @@ struct SkyPos {
 // overload places for a geocentric observer (`dt` unused); the second for an
 // observer on the Earth's surface.
 //
-// Implemented so far (validated against NOVAS, see test/unit/test_place.cpp):
+// Implemented so far (validated against NOVAS, see test/unit/test_place.cpp
+// and test_star.cpp):
+//   - object: major planet, Pluto, Sun, or Moon (not Earth), or a `Star`;
 //   - observer: geocenter and Earth surface;
-//   - object: major planet, Pluto, Sun, or Moon (not Earth; not stars yet);
 //   - coord_sys: `gcrs` (light deflection + aberration), `astrometric`
 //     (neither), and `equator_equinox` (apparent place of date: + frame tie,
 //     precession, nutation);
 //   - accuracy: `full` (IAU 2000A nutation, Sun+Jupiter+Saturn deflection) and
-//     `reduced` (NU2000K nutation, Sun-only deflection).
+//     `reduced` (NU2000K nutation, Sun-only deflection);
+//   - `SkyPos::radial_velocity_km_s` is computed (rad_vel); `distance_au` is 0
+//     for a star.
 //
-// Pending (return `EphError::not_implemented`): `equator_cio` (CIO machinery)
-// and the stellar object path. `SkyPos::radial_velocity_km_s` is not yet
-// computed (left 0) pending rad_vel.
+// Pending (return `EphError::not_implemented`): the `equator_cio` CIO system.
 std::expected<SkyPos, EphError> place(
     const Ephemeris& eph, Point body, TtInstant t, DeltaT dt,
     CoordSys sys, Accuracy accuracy);
 
 std::expected<SkyPos, EphError> place(
     const Ephemeris& eph, Point body, TtInstant t, DeltaT dt,
+    const SurfaceObserver& observer, CoordSys sys, Accuracy accuracy);
+
+std::expected<SkyPos, EphError> place(
+    const Ephemeris& eph, const Star& star, TtInstant t, DeltaT dt,
+    CoordSys sys, Accuracy accuracy);
+
+std::expected<SkyPos, EphError> place(
+    const Ephemeris& eph, const Star& star, TtInstant t, DeltaT dt,
     const SurfaceObserver& observer, CoordSys sys, Accuracy accuracy);
 
 // Polar motion (IERS Bulletin A) in arcseconds; both 0 to ignore.

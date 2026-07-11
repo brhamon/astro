@@ -83,5 +83,22 @@ int main(int argc, char** argv) {
                 sky->dec_deg, sky->distance_au,
                 90.0 - hor.zenith_distance_deg, hor.azimuth_deg);
   }
+
+  // A star, exercising the stellar path (proper motion / parallax / rad_vel).
+  // Polaris, from the SKY2000 catalog (same figures as the legacy demo).
+  const astro::Star polaris{2.5303010278, 89.2641094444,
+                            3442.95,       -11.8,
+                            7.56,          -17.4};
+  if (auto sky = astro::place(*eph, polaris, tt, delta_t, obs,
+                              astro::CoordSys::equator_equinox,
+                              astro::Accuracy::full)) {
+    auto hor = astro::equ2hor(ut1, delta_t, astro::Accuracy::full,
+                              astro::PolarMotion{}, obs, sky->ra_hours,
+                              sky->dec_deg, astro::Refraction::from_location);
+    std::printf("%-8s %12.6f %13.6f %16.9f %11.4f %11.4f  (rv %.2f km/s)\n",
+                "Polaris", sky->ra_hours, sky->dec_deg, sky->distance_au,
+                90.0 - hor.zenith_distance_deg, hor.azimuth_deg,
+                sky->radial_velocity_km_s);
+  }
   return 0;
 }

@@ -79,7 +79,7 @@ int main(int argc, char** argv) {
   const double step = (hi - lo) / (double)(n_samples + 1);
 
   printf("coord_sys,accuracy,body,where,lat,lon,height,delta_t,jd_tt,"
-         "ra,dec,dis,rx,ry,rz\n");
+         "ra,dec,dis,rx,ry,rz,rv\n");
 
   long emitted = 0, skipped = 0;
   for (int ci = 0; ci < (int)(sizeof(coord_systems) / sizeof(short)); ++ci) {
@@ -106,11 +106,11 @@ int main(int argc, char** argv) {
               continue;
             }
             printf("%d,%d,%d,%d,%.17g,%.17g,%.17g,%.17g,%.17g,"
-                   "%.17e,%.17e,%.17e,%.17e,%.17e,%.17e\n",
+                   "%.17e,%.17e,%.17e,%.17e,%.17e,%.17e,%.17e\n",
                    coord_systems[ci], accuracies[ai], bodies[bi].number,
                    sites[si].where, sites[si].lat, sites[si].lon,
                    sites[si].height, sites[si].delta_t, jd_tt, sp.ra, sp.dec,
-                   sp.dis, sp.r_hat[0], sp.r_hat[1], sp.r_hat[2]);
+                   sp.dis, sp.r_hat[0], sp.r_hat[1], sp.r_hat[2], sp.rv);
             ++emitted;
           }
         }

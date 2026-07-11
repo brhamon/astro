@@ -13,6 +13,7 @@ configured ephemeris, into the build tree before the tests that consume them:
 ```
 gen_state    (fixture) --> build/test/state_vectors.csv  --> replay
 gen_place    (fixture) --> build/test/place.csv          --> place
+gen_star     (fixture) --> build/test/star.csv           --> star
 gen_nutation (fixture) --> build/test/nutation.csv       --> nutation
 gen_hor      (fixture) --> build/test/hor.csv            --> hor
 gen_time     (fixture) --> build/test/time.csv           --> time
@@ -61,12 +62,15 @@ boundary epochs (span ends, record boundary, sub-interval boundaries).
 CSV columns:
 - state: `units,target,center,jd_hi,jd_lo,px,py,pz,vx,vy,vz`
   (`units`: 0 = AU/day, 1 = km/s; `jd` split as `jd_hi + jd_lo`, TDB)
-- place: `coord_sys,accuracy,body,where,lat,lon,height,delta_t,jd_tt,ra,dec,dis,rx,ry,rz`
+- place: `coord_sys,accuracy,body,where,lat,lon,height,delta_t,jd_tt,ra,dec,dis,rx,ry,rz,rv`
   (`coord_sys`: 0 = GCRS, 1 = true equator & equinox of date (apparent),
   3 = astrometric — the systems implemented so far; `accuracy`: 0 = full,
   1 = reduced; `body`: NOVAS number 1..11; `where`: 0 = geocenter, 1 = surface,
   with lat/lon in degrees, height in m, `delta_t` in s; ra in hours, dec in
-  degrees, dis in AU)
+  degrees, dis in AU, rv in km/s)
+- star: `coord_sys,accuracy,star,where,lat,lon,height,delta_t,jd_tt,ra,dec,dis,rx,ry,rz,rv`
+  (`star`: index into the shared catalog table mirrored in gen_star.c /
+  test_star.cpp; otherwise as `place`, with dis = 0 for a star)
 - nutation: `accuracy,jd_tdb,dpsi,deps,mean_obliq` (arcseconds)
 - hor: `accuracy,ref,jd_ut1,delta_t,lat,lon,height,temp,pressure,xp,yp,ra,dec,zd,az,rar,decr`
   (`ref`: 0 none, 1 standard, 2 from location; angles in degrees, ra/rar in hours)

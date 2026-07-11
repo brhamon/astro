@@ -16,18 +16,19 @@ generators in `test/gen/` are the oracles; see `test/`).
   `state()` (all reconstruction paths, both unit systems, two-part JD). ✅
 - **Earth orientation** — IAU 2000A / NU2000K nutation, mean obliquity,
   fundamental arguments, precession, frame tie, sidereal time. ✅
-- **Layer 2 `place()`** — geocentric & surface observers; `gcrs`, `astrometric`,
-  and `equator_equinox` (apparent of date); full & reduced accuracy. ✅
+- **Layer 2 `place()`** — solar-system bodies *and* stars (proper motion /
+  parallax); geocentric & surface observers; `gcrs`, `astrometric`, and
+  `equator_equinox` (apparent of date); full & reduced accuracy; radial
+  velocity (`rad_vel`). ✅
 - **`equ2hor`** — apparent RA/Dec → local zenith distance / azimuth, with polar
   motion and refraction. ✅
 - **Civil time** — calendar ⇄ Julian date, leap seconds, and UTC → {TT, UT1,
   delta_t} (`astro/time.hpp`). ✅
 - **`examples/planets`** — end-to-end demo taking a civil UTC date, through the
   public API (`utc_time_scales` → `place` → `equ2hor`), reproducing the legacy
-  `planets` core. ✅
+  `planets` core including its Polaris line. ✅
 
-Not yet: `place()` CIO system (`equator_cio`), the stellar object path
-(proper motion / parallax), and radial velocity (`rad_vel`).
+Not yet: `place()` CIO system (`equator_cio`).
 
 ## Relationship to the legacy C code
 
