@@ -7,6 +7,14 @@ eventual replacement for this project's use of NOVAS-C.
 Design rationale and the underlying data-model / API research live in
 [`../docs/de440-and-novas-research.md`](../docs/de440-and-novas-research.md).
 
+Learning the API:
+
+- **[`docs/tutorial.md`](docs/tutorial.md)** — a hands-on walkthrough: open the
+  ephemeris → planet positions → rise/set → seasons → apsides, in code or from
+  the command line.
+- **[`docs/reference.md`](docs/reference.md)** — the full public surface, layer
+  by layer, with the NOVAS-C analogue for each piece.
+
 ## Status
 
 Every implemented piece is validated **bit-for-bit against NOVAS-C** (the
@@ -25,12 +33,21 @@ generators in `test/gen/` are the oracles; see `test/`).
   motion and refraction. ✅
 - **Civil time** — calendar ⇄ Julian date, leap seconds, and UTC → {TT, UT1,
   delta_t} (`astro/time.hpp`). ✅
+- **Layer 3 phenomena** — derived events as lazy `std::generator` streams (not
+  day-keyed tables): `tropical_moments` (equinoxes/solstices), `horizon_events`
+  (rise/transit/set, with the standard horizon conventions), and `apsides`
+  (perihelion/aphelion, perigee/apogee). Each runs forward or backward from a
+  start time and computes only what you pull. ✅
 - **`examples/planets`** — end-to-end demo taking a civil UTC date, through the
   public API (`utc_time_scales` → `place` → `equ2hor`), reproducing the legacy
   `planets` core including its Polaris line. ✅
+- **`astro` CLI** — one multi-command tool exercising the whole surface (`state`,
+  `place`, `sky`, `rise`, `seasons`, `apsides`, `time`, `constant`, `info`),
+  built on a vendored header-only argument parser (`third_party/argparse`). ✅
 
-`place()` now covers the full NOVAS coordinate/object surface. Remaining
-niceties: library packaging (install / export / `find_package`).
+`place()` covers the full NOVAS coordinate/object surface, and the phenomena
+layer is in. Remaining niceties: library packaging (install / export /
+`find_package`).
 
 ## Relationship to the legacy C code
 
@@ -79,6 +96,12 @@ cmake -B build                      # add -G Ninja if you prefer Ninja
 cmake --build build
 ctest --test-dir build
 ./build/examples/planets 2025 6 21 20.0   # civil UTC date -> RA/Dec + Alt/Az table
+
+# ...or the multi-command CLI (see docs/tutorial.md):
+export LIBASTRO_EPHEMERIS=$PWD/data/JPLEPH
+./build/cli/astro sky     2025-06-21T20:00 --observer 47.61,-122.33,10
+./build/cli/astro seasons 2025-01-01 -n 4
+./build/cli/astro apsides earth 2025-01-01 -n 2
 ```
 
 Prefer the pinned toolchain? Prefix with `nix develop` (or run the above inside
@@ -132,12 +155,15 @@ how to refresh the golden files.
 
 ```
 flake.nix                 optional pinned toolchain (nix develop); not required
-CMakeLists.txt            library target `astro` + optional tests
+CMakeLists.txt            library target `astro` + optional tests/examples/CLI
 cmake/                    helper modules (mdspan resolution)
+docs/                     tutorial.md, reference.md
 third_party/mdspan/       vendored Kokkos std::mdspan (via scripts/vendor_mdspan.sh)
-include/astro/            public headers (Layer 0 + Layer 2 + vocabulary)
+third_party/argparse/     vendored p-ranav/argparse (MIT), used by the CLI
+include/astro/            public headers (Layer 0 + Layer 2 + Layer 3 + vocabulary)
 src/                      implementations
 examples/                 planets: end-to-end demo over the public API
+cli/                      astro: multi-command CLI over the public API
 tools/                    extract_nutation_tables.py (IAU 2000 series -> src/)
 scripts/                  fetch_ephemeris.sh, vendor_mdspan.sh
 data/                     fetched ephemeris (gitignored)
