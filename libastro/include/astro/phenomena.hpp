@@ -5,6 +5,7 @@
 
 #include "astro/accuracy.hpp"
 #include "astro/ephemeris.hpp"
+#include "astro/reductions.hpp"   // SurfaceObserver, DeltaT, Point
 #include "astro/time_scales.hpp"
 
 // Layer 3: derived phenomena over the place() pipeline -- lazy event streams
@@ -42,6 +43,43 @@ struct SeasonalMoment {
 // Lazy stream of equinoxes/solstices from `start`, forward or backward in time.
 std::generator<SeasonalMoment> tropical_moments(
     const Ephemeris& eph, TtInstant start, Direction dir = Direction::forward);
+
+// --- Rise / transit / set --------------------------------------------------
+// Meridian and horizon events for a body seen from a surface observer.
+enum class EventKind {
+  rise,           // altitude ascending through the horizon (h0)
+  upper_transit,  // upper culmination (meridian crossing, highest)
+  set,            // altitude descending through the horizon (h0)
+  lower_transit,  // lower culmination (meridian crossing, lowest)
+};
+
+// Standard horizon altitude h0 for rise/set. "Atmosphere" = a choice of h0,
+// applied to the geometric altitude (the robust convention; refraction is not
+// evaluated at the horizon directly).
+enum class Horizon {
+  geometric,               // h0 =  0        (airless)
+  star,                    // h0 = -0.5667   (standard refraction)
+  sun_upper_limb,          // h0 = -0.8333   (refraction - solar semidiameter)
+  moon,                    // h0 = +0.125    (refraction - SD + parallax, Meeus)
+  civil_twilight,          // h0 = -6        (Sun center)
+  nautical_twilight,       // h0 = -12
+  astronomical_twilight,   // h0 = -18
+};
+
+struct SkyEvent {
+  EventKind kind;
+  TtInstant time;
+  double altitude_deg = 0.0;  // h0 at rise/set; culmination altitude at transit
+  double azimuth_deg = 0.0;   // degrees east of north
+};
+
+// Lazy stream of rise/transit/set/lower-transit events for `body` at `observer`,
+// forward or backward from `start`. Circumpolar or never-rising bodies simply
+// yield no rise/set (the transits still occur). Pull only what you consume.
+std::generator<SkyEvent> horizon_events(
+    const Ephemeris& eph, Point body, const SurfaceObserver& observer,
+    TtInstant start, Horizon horizon = Horizon::star,
+    Direction dir = Direction::forward, DeltaT dt = {});
 
 }  // namespace astro
 

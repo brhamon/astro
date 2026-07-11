@@ -1,5 +1,6 @@
 #include "astro/phenomena.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -139,6 +140,102 @@ std::generator<SeasonalMoment> tropical_moments(const Ephemeris& eph,
     t0 = root;
     lam0 = tn;  // longitude at the found root == target (normalized)
     target += sign * 90.0;
+  }
+}
+
+namespace {
+
+// Standard horizon altitude (degrees) for rise/set, per convention.
+double h0_for(Horizon h) {
+  switch (h) {
+    case Horizon::geometric:             return 0.0;
+    case Horizon::star:                  return -0.5667;
+    case Horizon::sun_upper_limb:        return -0.8333;
+    case Horizon::moon:                  return 0.125;
+    case Horizon::civil_twilight:        return -6.0;
+    case Horizon::nautical_twilight:     return -12.0;
+    case Horizon::astronomical_twilight: return -18.0;
+  }
+  return -0.5667;
+}
+
+}  // namespace
+
+std::generator<SkyEvent> horizon_events(const Ephemeris& eph, Point body,
+                                        const SurfaceObserver& obs,
+                                        TtInstant start, Horizon horizon,
+                                        Direction dir, DeltaT dt) {
+  constexpr double kPi = 3.14159265358979323846;
+  const double h0 = h0_for(horizon);
+  const double step = (dir == Direction::forward ? 1.0 : -1.0) * (1.0 / 48.0);
+
+  // Geometric topocentric altitude (degrees) at TT jd t; NaN off the ephemeris.
+  auto altitude = [&](double t) -> double {
+    auto sky = place(eph, body, TtInstant{JulianDate{t}}, dt, obs,
+                     CoordSys::equator_equinox, Accuracy::full);
+    if (!sky) return std::numeric_limits<double>::quiet_NaN();
+    const Ut1Instant ut1{JulianDate{t - dt.seconds / 86400.0}};
+    const auto hor = equ2hor(ut1, dt, Accuracy::full, PolarMotion{}, obs,
+                             sky->ra_hours, sky->dec_deg, Refraction::none);
+    return 90.0 - hor.zenith_distance_deg;
+  };
+  // sin(hour angle): a smooth meridian function, zero at upper transit
+  // (crossing - -> +) and lower transit (+ -> -). NaN off the ephemeris.
+  auto meridian = [&](double t) -> double {
+    auto sky = place(eph, body, TtInstant{JulianDate{t}}, dt, obs,
+                     CoordSys::equator_equinox, Accuracy::full);
+    if (!sky) return std::numeric_limits<double>::quiet_NaN();
+    const Ut1Instant ut1{JulianDate{t - dt.seconds / 86400.0}};
+    const double gast = greenwich_apparent_sidereal_time(ut1, dt, Accuracy::full);
+    const double ha = gast + obs.longitude_deg / 15.0 - sky->ra_hours;  // hours
+    return std::sin(ha * kPi / 12.0);
+  };
+  auto event_at = [&](double t, EventKind k) -> SkyEvent {
+    auto sky = place(eph, body, TtInstant{JulianDate{t}}, dt, obs,
+                     CoordSys::equator_equinox, Accuracy::full);
+    const Ut1Instant ut1{JulianDate{t - dt.seconds / 86400.0}};
+    const auto hor = equ2hor(ut1, dt, Accuracy::full, PolarMotion{}, obs,
+                             sky ? sky->ra_hours : 0.0, sky ? sky->dec_deg : 0.0,
+                             Refraction::none);
+    return SkyEvent{k, TtInstant{JulianDate{t}}, 90.0 - hor.zenith_distance_deg,
+                    hor.azimuth_deg};
+  };
+
+  double t0 = start.jd.value();
+  double alt0 = altitude(t0), mer0 = meridian(t0);
+  if (std::isnan(alt0) || std::isnan(mer0)) co_return;
+
+  for (;;) {
+    const double t1 = t0 + step;
+    const double alt1 = altitude(t1), mer1 = meridian(t1);
+    if (std::isnan(alt1) || std::isnan(mer1)) co_return;
+
+    // Order the interval endpoints by time so rise/set direction is unambiguous.
+    double te, tl, alte, altl, mere, merl;
+    if (t0 < t1) { te = t0; tl = t1; alte = alt0; altl = alt1; mere = mer0; merl = mer1; }
+    else { te = t1; tl = t0; alte = alt1; altl = alt0; mere = mer1; merl = mer0; }
+
+    double et[2];
+    EventKind ek[2];
+    int n = 0;
+    if ((alte - h0) * (altl - h0) < 0.0) {  // horizon crossing -> rise/set
+      et[n] = brent([&](double t) { return altitude(t) - h0; }, te, tl,
+                    alte - h0, altl - h0, 1e-7);
+      ek[n] = (altl > alte) ? EventKind::rise : EventKind::set;
+      ++n;
+    }
+    if (mere * merl < 0.0) {  // meridian crossing -> transit
+      et[n] = brent(meridian, te, tl, mere, merl, 1e-7);
+      ek[n] = (merl > mere) ? EventKind::upper_transit : EventKind::lower_transit;
+      ++n;
+    }
+    if (n == 2) {  // emit in the stream's travel direction
+      const bool swap = (step > 0.0) ? (et[0] > et[1]) : (et[0] < et[1]);
+      if (swap) { std::swap(et[0], et[1]); std::swap(ek[0], ek[1]); }
+    }
+    for (int i = 0; i < n; ++i) co_yield event_at(et[i], ek[i]);
+
+    t0 = t1; alt0 = alt1; mer0 = mer1;
   }
 }
 

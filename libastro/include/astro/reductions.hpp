@@ -130,6 +130,12 @@ HorizonPos equ2hor(Ut1Instant t, DeltaT dt, Accuracy accuracy, PolarMotion pole,
                    const SurfaceObserver& observer, double ra_hours,
                    double dec_deg, Refraction refraction);
 
+// Greenwich apparent sidereal time (hours, in [0, 24)) at UT1 instant `t`.
+// GAST = GMST + equation of the equinoxes. NOVAS sidereal_time (equinox method,
+// apparent). Local apparent sidereal time is GAST + longitude/15.
+double greenwich_apparent_sidereal_time(Ut1Instant t, DeltaT dt,
+                                        Accuracy accuracy);
+
 }  // namespace astro
 
 #endif  // ASTRO_REDUCTIONS_HPP
