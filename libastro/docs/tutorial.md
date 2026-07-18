@@ -185,6 +185,10 @@ build/cli/astro seasons 2026-01-01 -n 4
 build/cli/astro apsides earth 2026-01-01 -n 4
 ```
 
+Any datetime argument also accepts the literal `now` for the current system time
+in UTC — e.g. `astro sky now --observer 47.61,-122.33,10` or `astro rise sun now
+--observer 47.61,-122.33,10`.
+
 See the [CLI table in the reference](reference.md#the-astro-cli) for every
 subcommand, and `astro <command> --help` for its options.
 

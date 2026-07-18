@@ -17,6 +17,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <iostream>
 #include <optional>
 #include <ranges>
@@ -57,8 +58,16 @@ std::optional<Ephemeris> open_ephem(const argparse::ArgumentParser& p) {
   return std::move(*e);
 }
 
-// UTC "YYYY-MM-DD[ T]HH:MM[:SS]" -> time scales (with a fixed observer 0 UT1-UTC).
+// UTC "YYYY-MM-DD[ T]HH:MM[:SS]", or the literal "now" (current system time in
+// UTC) -> time scales (with a fixed observer 0 UT1-UTC).
 std::optional<TimeScaleSet> parse_utc(const std::string& s) {
+  if (lower(s) == "now") {
+    const std::time_t t = std::time(nullptr);
+    std::tm g{};
+    gmtime_r(&t, &g);  // system time -> broken-down UTC
+    return utc_time_scales(g.tm_year + 1900, g.tm_mon + 1, g.tm_mday,
+                           g.tm_hour + g.tm_min / 60.0 + g.tm_sec / 3600.0);
+  }
   int y = 0, mo = 0, d = 0, h = 0, mi = 0;
   double se = 0.0;
   const int n = std::sscanf(s.c_str(), "%d-%d-%d%*[ T]%d:%d:%lf", &y, &mo, &d,
@@ -353,7 +362,7 @@ int main(int argc, char** argv) {
 
   argparse::ArgumentParser time_cmd("time");
   time_cmd.add_description("Convert a UTC instant to TT/UT1/TDB and show leap seconds.");
-  time_cmd.add_argument("datetime").help("UTC, YYYY-MM-DD[THH:MM[:SS]]");
+  time_cmd.add_argument("datetime").help("UTC, YYYY-MM-DD[THH:MM[:SS]], or 'now'");
 
   argparse::ArgumentParser constant("constant");
   constant.add_description("Look up named ephemeris constants, or list them all.");
@@ -364,7 +373,7 @@ int main(int argc, char** argv) {
   argparse::ArgumentParser state("state");
   state.add_description("Barycentric/relative state vector of a body.");
   state.add_argument("body");
-  state.add_argument("datetime").help("UTC");
+  state.add_argument("datetime").help("UTC or 'now'");
   state.add_argument("--center").default_value(std::string{"ssb"})
       .help("ssb | sun | earth | emb");
   with_ephem(state);
@@ -372,7 +381,7 @@ int main(int argc, char** argv) {
   argparse::ArgumentParser place_cmd("place");
   place_cmd.add_description("Apparent place (RA/Dec/dist/rv) of a body.");
   place_cmd.add_argument("body");
-  place_cmd.add_argument("datetime").help("UTC");
+  place_cmd.add_argument("datetime").help("UTC or 'now'");
   place_cmd.add_argument("--observer").help("lat,lon,height (deg,deg,m); geocentric if omitted");
   place_cmd.add_argument("--coord").default_value(std::string{"apparent"})
       .help("apparent | gcrs | astrometric | cio");
@@ -382,14 +391,14 @@ int main(int argc, char** argv) {
 
   argparse::ArgumentParser sky("sky");
   sky.add_description("Planet+Polaris table (RA/Dec/dist and alt/az) for an observer.");
-  sky.add_argument("datetime").help("UTC");
+  sky.add_argument("datetime").help("UTC or 'now'");
   sky.add_argument("--observer").help("lat,lon,height (default: Seattle)");
   with_ephem(sky);
 
   argparse::ArgumentParser rise("rise");
   rise.add_description("Rise / transit / set / antitransit stream for a body.");
   rise.add_argument("body");
-  rise.add_argument("datetime").help("UTC start");
+  rise.add_argument("datetime").help("UTC start, or 'now'");
   rise.add_argument("--observer").required().help("lat,lon,height");
   rise.add_argument("--horizon").default_value(std::string{"star"})
       .help("geometric|star|sun|moon|civil|nautical|astronomical");
@@ -398,14 +407,14 @@ int main(int argc, char** argv) {
 
   argparse::ArgumentParser seasons("seasons");
   seasons.add_description("Equinox/solstice stream.");
-  seasons.add_argument("datetime").help("UTC start");
+  seasons.add_argument("datetime").help("UTC start, or 'now'");
   with_stream(seasons);
   with_ephem(seasons);
 
   argparse::ArgumentParser apsides_cmd("apsides");
   apsides_cmd.add_description("Perihelion/aphelion (or perigee/apogee) stream.");
   apsides_cmd.add_argument("body");
-  apsides_cmd.add_argument("datetime").help("UTC start");
+  apsides_cmd.add_argument("datetime").help("UTC start, or 'now'");
   apsides_cmd.add_argument("--center").default_value(std::string{"sun"})
       .help("sun (perihelion/aphelion) | earth (perigee/apogee)");
   with_stream(apsides_cmd);
