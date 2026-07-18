@@ -244,8 +244,9 @@ double sun_apparent_longitude(const Ephemeris&, TtInstant t);         // [0,360)
 ## The `astro` CLI
 
 One tool over the whole surface (built with `-DLIBASTRO_BUILD_CLI=ON`, default
-for a top-level build). Times are civil UTC (`YYYY-MM-DD[THH:MM[:SS]]`); the
-ephemeris is located via `--ephemeris`, `$LIBASTRO_EPHEMERIS`, or `./data/JPLEPH`.
+for a top-level build). Times are civil UTC (`YYYY-MM-DD[THH:MM[:SS]]`), or the
+literal `now` for the current system time in UTC; the ephemeris is located via
+`--ephemeris`, `$LIBASTRO_EPHEMERIS`, or `./data/JPLEPH`.
 
 | Command | Purpose |
 |---------|---------|
