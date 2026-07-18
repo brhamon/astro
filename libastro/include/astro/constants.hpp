@@ -35,6 +35,12 @@ class Constants {
   std::size_t size() const noexcept { return values_.size(); }
   bool empty() const noexcept { return values_.empty(); }
 
+  // All name/value pairs, for enumeration (e.g. listing every constant). The
+  // order is unspecified (hash order); sort by name if you need a stable list.
+  const std::unordered_map<std::string, double>& entries() const noexcept {
+    return values_;
+  }
+
  private:
   std::unordered_map<std::string, double> values_;
 };

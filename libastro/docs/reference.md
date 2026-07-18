@@ -251,7 +251,7 @@ ephemeris is located via `--ephemeris`, `$LIBASTRO_EPHEMERIS`, or `./data/JPLEPH
 |---------|---------|
 | `astro info` | ephemeris header |
 | `astro time <utc>` | UTC → TT/UT1/TDB + leap seconds |
-| `astro constant <NAME>…` | named record-2 constants |
+| `astro constant [NAME…]` | named record-2 constants; omit names to list them all (see [constants.md](constants.md)) |
 | `astro state <body> <utc> [--center ssb\|sun\|earth\|emb]` | Layer 0 state vector |
 | `astro place <body> <utc> [--observer lat,lon,h] [--coord apparent\|gcrs\|astrometric\|cio] [--accuracy full\|reduced]` | apparent place |
 | `astro sky <utc> [--observer lat,lon,h]` | planet + Polaris table (RA/Dec/dist, alt/az) |
