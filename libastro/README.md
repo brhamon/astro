@@ -14,6 +14,8 @@ Learning the API:
   the command line.
 - **[`docs/reference.md`](docs/reference.md)** — the full public surface, layer
   by layer, with the NOVAS-C analogue for each piece.
+- **[`docs/constants.md`](docs/constants.md)** — the named ephemeris constants
+  (record 2): what each is, units, and how to list them.
 
 ## Status
 
@@ -188,7 +190,7 @@ how to refresh the golden files.
 flake.nix                 optional pinned toolchain (nix develop); not required
 CMakeLists.txt            library target `astro` + optional tests/examples/CLI
 cmake/                    helper modules (mdspan resolution)
-docs/                     tutorial.md, reference.md
+docs/                     tutorial.md, reference.md, constants.md
 third_party/mdspan/       vendored Kokkos std::mdspan (via scripts/vendor_mdspan.sh)
 third_party/argparse/     vendored p-ranav/argparse (MIT), used by the CLI
 include/astro/            public headers (Layer 0 + Layer 2 + Layer 3 + vocabulary)

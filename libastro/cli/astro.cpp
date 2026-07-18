@@ -13,6 +13,7 @@
 //   astro apsides earth 2026-07-11 [--center sun|earth] [-n N] [--back]
 
 #include <argparse/argparse.hpp>
+#include <algorithm>
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
@@ -20,6 +21,7 @@
 #include <optional>
 #include <ranges>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "astro/ephemeris.hpp"
@@ -163,12 +165,26 @@ int run_time(const argparse::ArgumentParser& a) {
 int run_constant(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
+  const auto& consts = eph->constants();
+  const auto names = a.get<std::vector<std::string>>("name");
+
+  if (names.empty()) {  // no names given -> list every constant, sorted by name
+    std::vector<std::pair<std::string, double>> all(consts.entries().begin(),
+                                                    consts.entries().end());
+    std::sort(all.begin(), all.end(),
+              [](const auto& x, const auto& y) { return x.first < y.first; });
+    for (const auto& [name, value] : all)
+      std::printf("%-10s = %.17g\n", name.c_str(), value);
+    std::fprintf(stderr, "(%zu constants; see docs/constants.md)\n", all.size());
+    return 0;
+  }
+
   int missing = 0;
-  for (const auto& name : a.get<std::vector<std::string>>("name")) {
-    if (auto v = eph->constants().get(name))
-      std::printf("%-8s = %.17g\n", name.c_str(), *v);
+  for (const auto& name : names) {
+    if (auto v = consts.get(name))
+      std::printf("%-10s = %.17g\n", name.c_str(), *v);
     else {
-      std::printf("%-8s = (not found)\n", name.c_str());
+      std::printf("%-10s = (not found)\n", name.c_str());
       ++missing;
     }
   }
@@ -340,8 +356,9 @@ int main(int argc, char** argv) {
   time_cmd.add_argument("datetime").help("UTC, YYYY-MM-DD[THH:MM[:SS]]");
 
   argparse::ArgumentParser constant("constant");
-  constant.add_description("Look up named ephemeris constants.");
-  constant.add_argument("name").nargs(argparse::nargs_pattern::at_least_one);
+  constant.add_description("Look up named ephemeris constants, or list them all.");
+  constant.add_argument("name").nargs(argparse::nargs_pattern::any)
+      .help("constant name(s); omit to list every constant in the ephemeris");
   with_ephem(constant);
 
   argparse::ArgumentParser state("state");
