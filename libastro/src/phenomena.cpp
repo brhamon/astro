@@ -95,6 +95,15 @@ double sun_apparent_longitude(const Ephemeris& eph, TtInstant t) {
   return lon;
 }
 
+double moon_apparent_longitude(const Ephemeris& eph, TtInstant t) {
+  auto sky = place(eph, Point::moon, t, DeltaT{0.0}, CoordSys::equator_equinox,
+                   Accuracy::full);
+  if (!sky) return std::numeric_limits<double>::quiet_NaN();
+  double lon, lat;
+  equ_to_ecl_of_date(t.jd.value(), sky->ra_hours, sky->dec_deg, lon, lat);
+  return lon;
+}
+
 std::generator<SeasonalMoment> tropical_moments(const Ephemeris& eph,
                                                 TtInstant start, Direction dir) {
   const double sign = (dir == Direction::forward) ? 1.0 : -1.0;
@@ -140,6 +149,69 @@ std::generator<SeasonalMoment> tropical_moments(const Ephemeris& eph,
 
     t0 = root;
     lam0 = tn;  // longitude at the found root == target (normalized)
+    target += sign * 90.0;
+  }
+}
+
+namespace {
+// Moon-Sun elongation in ecliptic longitude of date, [0, 360) deg.
+double moon_sun_elongation(const Ephemeris& eph, double jd_tt) {
+  const TtInstant t{JulianDate{jd_tt}};
+  const double lm = moon_apparent_longitude(eph, t);
+  const double ls = sun_apparent_longitude(eph, t);
+  if (std::isnan(lm) || std::isnan(ls))
+    return std::numeric_limits<double>::quiet_NaN();
+  double d = std::fmod(lm - ls, 360.0);
+  if (d < 0.0) d += 360.0;
+  return d;
+}
+}  // namespace
+
+std::generator<LunarPhaseMoment> lunar_phases(const Ephemeris& eph,
+                                              TtInstant start, Direction dir) {
+  const double sign = (dir == Direction::forward) ? 1.0 : -1.0;
+  const double rate = 360.0 / 29.530588853;  // mean synodic elongation, deg/day
+
+  double t0 = start.jd.value();
+  double d0 = moon_sun_elongation(eph, t0);
+  if (std::isnan(d0)) co_return;
+
+  // First target: the next multiple of 90 deg in the direction of travel.
+  const double k = std::floor(d0 / 90.0);
+  double target = (sign > 0.0) ? (k + 1.0) * 90.0 : k * 90.0;
+  if (sign < 0.0 && std::fabs(fold180(d0 - target)) < 1e-9) target -= 90.0;
+
+  auto g = [&](double t) {
+    const double d = moon_sun_elongation(eph, t);
+    return std::isnan(d) ? d : fold180(d - target);
+  };
+
+  for (;;) {
+    double guess = t0 + fold180(target - d0) / rate;  // rate-jump to the root
+    double w = 2.0;                                    // days, << quarter lunation
+    double a = guess - w, b = guess + w, ga = g(a), gb = g(b);
+    for (int tries = 0; (std::isnan(ga) || std::isnan(gb) || ga * gb > 0.0) &&
+                        tries < 8;
+         ++tries) {
+      if (std::isnan(ga) || std::isnan(gb)) co_return;  // off the ephemeris
+      w *= 2.0;
+      a = guess - w; b = guess + w; ga = g(a); gb = g(b);
+    }
+    if (ga * gb > 0.0) co_return;  // failed to bracket
+
+    const double root = brent(g, a, b, ga, gb, 1e-7);
+
+    double tn = std::fmod(target, 360.0);
+    if (tn < 0.0) tn += 360.0;
+    const int idx = static_cast<int>(std::llround(tn / 90.0)) % 4;
+    const LunarPhase phase = (idx == 0)   ? LunarPhase::new_moon
+                             : (idx == 1) ? LunarPhase::first_quarter
+                             : (idx == 2) ? LunarPhase::full_moon
+                                          : LunarPhase::last_quarter;
+    co_yield LunarPhaseMoment{phase, TtInstant{JulianDate{root}}};
+
+    t0 = root;
+    d0 = tn;  // elongation at the found root == target (normalized)
     target += sign * 90.0;
   }
 }

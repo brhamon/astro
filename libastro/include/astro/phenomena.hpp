@@ -26,6 +26,9 @@ void equ_to_ecl_of_date(double jd_tt, double ra_hours, double dec_deg,
 // The Sun's apparent geocentric ecliptic longitude of date, in [0, 360) degrees.
 double sun_apparent_longitude(const Ephemeris& eph, TtInstant t);
 
+// The Moon's apparent geocentric ecliptic longitude of date, in [0, 360) degrees.
+double moon_apparent_longitude(const Ephemeris& eph, TtInstant t);
+
 // --- Tropical moments (equinoxes and solstices) ----------------------------
 // Defined by the Sun's apparent ecliptic longitude reaching a multiple of 90 deg.
 enum class Season {
@@ -42,6 +45,26 @@ struct SeasonalMoment {
 
 // Lazy stream of equinoxes/solstices from `start`, forward or backward in time.
 std::generator<SeasonalMoment> tropical_moments(
+    const Ephemeris& eph, TtInstant start, Direction dir = Direction::forward);
+
+// --- Lunar phases (new / quarters / full) ----------------------------------
+// The Moon's principal phases: moments when the Moon-Sun elongation in ecliptic
+// longitude reaches a multiple of 90 deg. The lunar twin of tropical_moments
+// (geocentric; a phase moment is not observer-dependent).
+enum class LunarPhase {
+  new_moon,       // elongation   0 deg
+  first_quarter,  // elongation  90 deg
+  full_moon,      // elongation 180 deg
+  last_quarter,   // elongation 270 deg
+};
+
+struct LunarPhaseMoment {
+  LunarPhase phase;
+  TtInstant time;
+};
+
+// Lazy stream of principal lunar phases from `start`, forward or backward.
+std::generator<LunarPhaseMoment> lunar_phases(
     const Ephemeris& eph, TtInstant start, Direction dir = Direction::forward);
 
 // --- Rise / transit / set --------------------------------------------------

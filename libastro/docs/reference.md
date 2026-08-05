@@ -196,6 +196,22 @@ struct SeasonalMoment { Season season; TtInstant time; };
 
 Defined by the Sun's apparent ecliptic longitude reaching a multiple of 90°.
 
+### Lunar phases — new / quarters / full
+
+```cpp
+std::generator<LunarPhaseMoment>
+    lunar_phases(const Ephemeris&, TtInstant start, Direction = forward);
+
+enum class LunarPhase { new_moon, first_quarter, full_moon, last_quarter };
+struct LunarPhaseMoment { LunarPhase phase; TtInstant time; };
+
+double moon_apparent_longitude(const Ephemeris&, TtInstant);  // [0,360) deg
+```
+
+The lunar twin of `tropical_moments`: moments when the Moon−Sun elongation in
+ecliptic longitude (`moon_apparent_longitude − sun_apparent_longitude`) reaches
+a multiple of 90°. Geocentric — a phase moment is not observer-dependent.
+
 ### Rise / transit / set
 
 ```cpp
@@ -259,6 +275,7 @@ literal `now` for the current system time in UTC; the ephemeris is located via
 | `astro rise <body> <utc> --observer lat,lon,h [--horizon …] [-n N] [--back]` | rise/transit/set stream |
 | `astro seasons <utc> [-n N] [--back]` | equinox/solstice stream |
 | `astro apsides <body> <utc> [--center sun\|earth] [-n N] [--back]` | perihelion/aphelion or perigee/apogee |
-| `astro moon <utc> [--observer lat,lon,h]` | Moon phase: illuminated %, phase angle, elongation, named phase (topocentric with `--observer`, else geometric geocentric) |
+| `astro moon <utc> [--observer lat,lon,h]` | Moon phase snapshot: illuminated %, phase angle, elongation, named phase (topocentric with `--observer`, else geometric geocentric) |
+| `astro moon <utc> -n N [--back]` | stream of principal phase moments (new/quarters/full); geocentric (`--observer` ignored) |
 
 Run `astro <command> --help` for the options of any subcommand.
