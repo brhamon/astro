@@ -259,5 +259,6 @@ literal `now` for the current system time in UTC; the ephemeris is located via
 | `astro rise <body> <utc> --observer lat,lon,h [--horizon …] [-n N] [--back]` | rise/transit/set stream |
 | `astro seasons <utc> [-n N] [--back]` | equinox/solstice stream |
 | `astro apsides <body> <utc> [--center sun\|earth] [-n N] [--back]` | perihelion/aphelion or perigee/apogee |
+| `astro moon <utc> [--observer lat,lon,h]` | Moon phase: illuminated %, phase angle, elongation, named phase (topocentric with `--observer`, else geometric geocentric) |
 
 Run `astro <command> --help` for the options of any subcommand.

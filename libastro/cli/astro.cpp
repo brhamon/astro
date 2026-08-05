@@ -11,10 +11,12 @@
 //   astro rise    sun  2026-07-11 --observer 47.6,-122.3,10 [--horizon ...] [-n]
 //   astro seasons 2026-07-11 [-n N] [--back]
 //   astro apsides earth 2026-07-11 [--center sun|earth] [-n N] [--back]
+//   astro moon    2026-07-11 [--observer 47.6,-122.3,10]
 
 #include <argparse/argparse.hpp>
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
@@ -340,6 +342,96 @@ int run_apsides(const argparse::ArgumentParser& a) {
   return 0;
 }
 
+// --- moon phase ------------------------------------------------------------
+constexpr double kRadToDeg = 57.2957795130823208768;
+constexpr double kRadToHours = 3.81971863420548805845;  // 12 / pi
+
+// Name one of the eight equal 45-deg phase buckets from the age (Moon - Sun
+// ecliptic longitude, 0..360), centered on the cardinal phases.
+const char* moon_phase_name(double age_deg) {
+  static const char* kNames[8] = {
+      "new moon",  "waxing crescent", "first quarter", "waxing gibbous",
+      "full moon", "waning gibbous",  "last quarter",  "waning crescent"};
+  const int idx = static_cast<int>(std::floor(std::fmod(age_deg + 22.5, 360.0) / 45.0));
+  return kNames[((idx % 8) + 8) % 8];
+}
+
+int run_moon(const argparse::ArgumentParser& a) {
+  auto eph = open_ephem(a);
+  if (!eph) return 1;
+  auto ts = parse_utc(a.get<std::string>("datetime"));
+  if (!ts) { std::fprintf(stderr, "error: bad datetime\n"); return 2; }
+
+  // Moon and Sun vectors (AU) in a common frame, plus apparent RA/Dec for the
+  // ecliptic-longitude elongation. Topocentric (apparent) when --observer is
+  // given; otherwise geometric geocentric.
+  double moon[3], sun[3], ra_m, dec_m, ra_s, dec_s, moon_au;
+  bool topo = false;
+
+  if (auto os = a.present<std::string>("--observer")) {
+    auto obs = parse_observer(*os);
+    if (!obs) { std::fprintf(stderr, "error: bad --observer\n"); return 2; }
+    topo = true;
+    auto pm = place(*eph, Point::moon, ts->tt, ts->delta_t, *obs,
+                    CoordSys::equator_equinox, Accuracy::full);
+    auto ps = place(*eph, Point::sun, ts->tt, ts->delta_t, *obs,
+                    CoordSys::equator_equinox, Accuracy::full);
+    if (!pm || !ps) { std::fprintf(stderr, "error: place failed\n"); return 1; }
+    for (int i = 0; i < 3; ++i) {
+      moon[i] = pm->distance_au * pm->r_hat[i];
+      sun[i] = ps->distance_au * ps->r_hat[i];
+    }
+    ra_m = pm->ra_hours; dec_m = pm->dec_deg;
+    ra_s = ps->ra_hours; dec_s = ps->dec_deg;
+    moon_au = pm->distance_au;
+  } else {
+    const auto tdb = tdb_from_tt(ts->tt);
+    auto sm = eph->state(Point::moon, Point::earth, tdb, Units::au);
+    auto ss = eph->state(Point::sun, Point::earth, tdb, Units::au);
+    if (!sm) { std::fprintf(stderr, "error: %s\n", std::string(to_string(sm.error())).c_str()); return 1; }
+    if (!ss) { std::fprintf(stderr, "error: %s\n", std::string(to_string(ss.error())).c_str()); return 1; }
+    for (int i = 0; i < 3; ++i) { moon[i] = sm->position[i]; sun[i] = ss->position[i]; }
+    const double rm = std::sqrt(moon[0]*moon[0] + moon[1]*moon[1] + moon[2]*moon[2]);
+    const double rs = std::sqrt(sun[0]*sun[0] + sun[1]*sun[1] + sun[2]*sun[2]);
+    ra_m = std::fmod(std::atan2(moon[1], moon[0]) * kRadToHours + 24.0, 24.0);
+    dec_m = std::asin(moon[2] / rm) * kRadToDeg;
+    ra_s = std::fmod(std::atan2(sun[1], sun[0]) * kRadToHours + 24.0, 24.0);
+    dec_s = std::asin(sun[2] / rs) * kRadToDeg;
+    moon_au = rm;
+  }
+
+  auto dot = [](const double* p, const double* q) { return p[0]*q[0] + p[1]*q[1] + p[2]*q[2]; };
+  const double ms[3] = {moon[0] - sun[0], moon[1] - sun[1], moon[2] - sun[2]};
+  const double mag_m = std::sqrt(dot(moon, moon));
+  const double mag_s = std::sqrt(dot(sun, sun));
+  const double mag_ms = std::sqrt(dot(ms, ms));
+
+  // Phase angle i = angle(Moon, Moon-Sun) = the Sun-Moon-Earth angle (an angle
+  // between vectors, so frame-independent). Illuminated fraction = (1+cos i)/2.
+  const double cos_i = std::clamp(dot(moon, ms) / (mag_m * mag_ms), -1.0, 1.0);
+  const double i_deg = std::acos(cos_i) * kRadToDeg;
+  const double illum = 0.5 * (1.0 + cos_i);
+  const double elong = std::acos(std::clamp(dot(moon, sun) / (mag_m * mag_s), -1.0, 1.0)) * kRadToDeg;
+
+  // Age = Moon - Sun ecliptic longitude (0..360): drives the named phase and
+  // distinguishes waxing from waning (the phase angle alone cannot).
+  double lam_m, bet_m, lam_s, bet_s;
+  equ_to_ecl_of_date(ts->tt.jd.value(), ra_m, dec_m, lam_m, bet_m);
+  equ_to_ecl_of_date(ts->tt.jd.value(), ra_s, dec_s, lam_s, bet_s);
+  const double age = std::fmod(lam_m - lam_s + 360.0, 360.0);
+
+  std::printf("Moon phase @ %s (%s)\n", tt_to_utc(ts->tt.jd.value()).c_str(),
+              topo ? "topocentric" : "geocentric, geometric");
+  std::printf("  phase       : %s\n", moon_phase_name(age));
+  std::printf("  illuminated : %.1f%%\n", 100.0 * illum);
+  std::printf("  phase angle : %.2f deg  (Sun-Moon-Earth)\n", i_deg);
+  std::printf("  elongation  : %.2f deg  (Sun-Moon angular separation)\n", elong);
+  std::printf("  age         : %.2f deg  (~%.1f days since new)\n", age,
+              age / 360.0 * 29.530588853);
+  std::printf("  distance    : %.0f km\n", moon_au * eph->header().au_km);
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -420,6 +512,13 @@ int main(int argc, char** argv) {
   with_stream(apsides_cmd);
   with_ephem(apsides_cmd);
 
+  argparse::ArgumentParser moon("moon");
+  moon.add_description("Moon phase: illuminated fraction, phase angle, elongation, named phase.");
+  moon.add_argument("datetime").help("UTC or 'now'");
+  moon.add_argument("--observer")
+      .help("lat,lon,height (deg,deg,m); topocentric if given, else geometric geocentric");
+  with_ephem(moon);
+
   program.add_subparser(info);
   program.add_subparser(time_cmd);
   program.add_subparser(constant);
@@ -429,6 +528,7 @@ int main(int argc, char** argv) {
   program.add_subparser(rise);
   program.add_subparser(seasons);
   program.add_subparser(apsides_cmd);
+  program.add_subparser(moon);
 
   try {
     program.parse_args(argc, argv);
@@ -447,6 +547,7 @@ int main(int argc, char** argv) {
   if (program.is_subcommand_used("rise")) return run_rise(rise);
   if (program.is_subcommand_used("seasons")) return run_seasons(seasons);
   if (program.is_subcommand_used("apsides")) return run_apsides(apsides_cmd);
+  if (program.is_subcommand_used("moon")) return run_moon(moon);
 
   std::cerr << program;
   return 2;
