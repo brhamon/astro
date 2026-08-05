@@ -183,6 +183,8 @@ build/cli/astro sky     2026-07-11T04:00 --observer 47.61,-122.33,10
 build/cli/astro rise    sun 2026-07-11 --observer 47.61,-122.33,10 --horizon sun -n 4
 build/cli/astro seasons 2026-01-01 -n 4
 build/cli/astro apsides earth 2026-01-01 -n 4
+build/cli/astro moon    now                                     # phase, illuminated %
+build/cli/astro moon    now --observer 47.61,-122.33,10         # topocentric
 ```
 
 Any datetime argument also accepts the literal `now` for the current system time
