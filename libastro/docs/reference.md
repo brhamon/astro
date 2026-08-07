@@ -272,6 +272,13 @@ impossible or ambiguous local input time (a DST gap or overlap) is reported as
 an error rather than guessed. `now` is unaffected by the zone (it is an instant)
 but is displayed in it.
 
+**`--json`** (on every command) emits machine-readable JSON on stdout instead of
+the text layout: an object for the snapshot commands, an array of objects for
+the event streams (`rise`, `seasons`, `apsides`, `moon -n`). Times are ISO-8601
+with the `--timezone` offset (e.g. `2026-08-06T02:21:29-07:00`), and event
+moments also carry `jd_tt` for full precision. Notes and errors go to stderr, so
+stdout is always clean JSON.
+
 | Command | Purpose |
 |---------|---------|
 | `astro info` | ephemeris header |

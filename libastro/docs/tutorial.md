@@ -199,6 +199,14 @@ build/cli/astro rise    sun "2026-08-05 20:00" --observer 47.61,-122.33,10 \
                         --timezone local                        # local civil in and out
 ```
 
+Add `--json` to any command for machine-readable output (times as ISO-8601 with
+the timezone offset) — handy for piping into `jq` or a script:
+
+```sh
+build/cli/astro moon now --json
+build/cli/astro apsides earth 2026-01-01 -n 2 --json | jq '.[].distance_au'
+```
+
 Any datetime argument also accepts the literal `now` for the current system time
 in UTC — e.g. `astro sky now --observer 47.61,-122.33,10` or `astro rise sun now
 --observer 47.61,-122.33,10`.
