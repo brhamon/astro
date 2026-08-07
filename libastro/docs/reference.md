@@ -317,7 +317,7 @@ stdout is always clean JSON.
 | `astro state <body> <utc> [--center ssb\|sun\|earth\|emb]` | Layer 0 state vector |
 | `astro place <body> <utc> [--observer lat,lon,h] [--coord apparent\|gcrs\|astrometric\|cio] [--accuracy full\|reduced]` | apparent place |
 | `astro star <HIP> <utc> [--observer lat,lon,h] [--coord …] [--catalog PATH]` | place a Hipparcos catalogue star (RA/Dec, distance, alt/az) |
-| `astro sky <utc> [--observer lat,lon,h]` | planet + Polaris table (RA/Dec/dist, alt/az) |
+| `astro sky <utc> [--observer lat,lon,h]` | solar-system table: Sun, Moon, planets (RA/Dec/dist, alt/az). For stars use `astro star`. |
 | `astro rise <body> <utc> --observer lat,lon,h [--horizon …] [-n N] [--back]` | rise/transit/set stream |
 | `astro seasons <utc> [-n N] [--back]` | equinox/solstice stream |
 | `astro apsides <body> <utc> [--center sun\|earth] [-n N] [--back]` | perihelion/aphelion or perigee/apogee |

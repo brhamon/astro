@@ -440,20 +440,6 @@ int run_sky(const argparse::ArgumentParser& a) {
                   std::string(to_string(b)).c_str(), sky->ra_hours, sky->dec_deg,
                   sky->distance_au, alt, hor.azimuth_deg);
   }
-  const Star polaris{2.5303010278, 89.2641094444, 3442.95, -11.8, 7.56, -17.4};
-  if (auto sky = place(*eph, polaris, ts->tt, ts->delta_t, obs,
-                       CoordSys::equator_equinox, Accuracy::full)) {
-    auto hor = equ2hor(ts->ut1, ts->delta_t, Accuracy::full, PolarMotion{}, obs,
-                       sky->ra_hours, sky->dec_deg, Refraction::from_location);
-    const double alt = 90.0 - hor.zenith_distance_deg;
-    if (json)
-      jrow("Polaris", sky->ra_hours, sky->dec_deg, parallax_distance_au(polaris),
-           alt, hor.azimuth_deg);
-    else
-      std::printf("%-8s %12.6f %13.6f %16.6e %11.4f %11.4f\n", "Polaris",
-                  sky->ra_hours, sky->dec_deg, parallax_distance_au(polaris),
-                  alt, hor.azimuth_deg);
-  }
   if (json) std::printf("]}\n");
   return 0;
 }
@@ -847,7 +833,7 @@ int main(int argc, char** argv) {
   with_ephem(star);
 
   argparse::ArgumentParser sky("sky");
-  sky.add_description("Planet+Polaris table (RA/Dec/dist and alt/az) for an observer.");
+  sky.add_description("Planet table (RA/Dec/dist and alt/az) for an observer.");
   sky.add_argument("datetime").help("UTC or 'now'");
   sky.add_argument("--observer").help("lat,lon,height (default: Seattle)");
   with_timezone(sky);
