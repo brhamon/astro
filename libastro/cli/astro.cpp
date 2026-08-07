@@ -1,7 +1,8 @@
 // astro -- a multi-command command-line tool exercising the libastro surface:
 // ephemeris state and constants, place() (planets + a star), equ2hor, and the
 // phenomena streams (rise/transit/set, seasons, apsides). Civil time is UTC by
-// default; --timezone <IANA name|local|utc> controls both input and output.
+// default; --timezone <IANA name|local|utc> controls both input and output, and
+// --json emits machine-readable JSON instead of text (on any command).
 //
 //   astro info
 //   astro time    2026-07-11T17:24
@@ -26,6 +27,7 @@
 #include <optional>
 #include <ranges>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -179,12 +181,55 @@ std::string format_civil(double tt_jd, const std::chrono::time_zone* zone) {
                      zoned_time{zone, sys_seconds{seconds{unix}}});
 }
 
+// TT Julian date -> an ISO-8601 timestamp with numeric offset in `zone` (e.g.
+// "2026-08-06T02:21:29-07:00"), the machine-friendly form used in JSON output.
+std::string format_iso(double tt_jd, const std::chrono::time_zone* zone) {
+  using namespace std::chrono;
+  const double leap = tai_minus_utc(tt_jd);
+  const double utc_jd = tt_jd - (leap + 32.184) / 86400.0;
+  const long long unix = std::llround((utc_jd - 2440587.5) * 86400.0);
+  return std::format("{:%FT%T%Ez}", zoned_time{zone, sys_seconds{seconds{unix}}});
+}
+
+// A JSON string literal: double-quoted, with the mandatory characters escaped.
+std::string jstr(std::string_view v) {
+  std::string o = "\"";
+  for (char c : v) {
+    switch (c) {
+      case '"':  o += "\\\""; break;
+      case '\\': o += "\\\\"; break;
+      case '\n': o += "\\n"; break;
+      case '\t': o += "\\t"; break;
+      case '\r': o += "\\r"; break;
+      default:
+        if (static_cast<unsigned char>(c) < 0x20) {
+          char b[8];
+          std::snprintf(b, sizeof b, "\\u%04x", static_cast<unsigned char>(c));
+          o += b;
+        } else {
+          o += c;
+        }
+    }
+  }
+  o += '"';
+  return o;
+}
+
 // ------------------------------- subcommands -------------------------------
 
 int run_info(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
   const auto& h = eph->header();
+  if (a.get<bool>("--json")) {
+    std::printf("{\"title\":%s,\"de_number\":%d,\"jd_begin\":%.10g,"
+                "\"jd_end\":%.10g,\"days_per_record\":%.0f,\"records\":%zu,"
+                "\"constants\":%d,\"au_km\":%.10g,\"earth_moon_ratio\":%.12g}\n",
+                jstr(h.title).c_str(), h.denum, h.jd_begin, h.jd_end,
+                h.days_per_record, h.record_count, h.n_constants, h.au_km,
+                h.earth_moon_ratio);
+    return 0;
+  }
   std::printf("%s\n", h.title.c_str());
   std::printf("  DE number   : %d\n", h.denum);
   std::printf("  JD span     : %.1f .. %.1f\n", h.jd_begin, h.jd_end);
@@ -201,6 +246,16 @@ int run_time(const argparse::ArgumentParser& a) {
   if (!zone) return 2;
   auto ts = parse_utc(a.get<std::string>("datetime"), zone);
   if (!ts) return 2;
+  if (a.get<bool>("--json")) {
+    std::printf("{\"civil\":%s,\"timezone\":%s,\"jd_utc\":%.6f,"
+                "\"leap_seconds\":%.0f,\"jd_tt\":%.9f,\"jd_ut1\":%.9f,"
+                "\"jd_tdb\":%.9f,\"delta_t_seconds\":%.3f}\n",
+                jstr(format_iso(ts->tt.jd.value(), zone)).c_str(),
+                jstr(a.get<std::string>("--timezone")).c_str(), ts->jd_utc,
+                ts->leap_seconds, ts->tt.jd.value(), ts->ut1.jd.value(),
+                tdb_from_tt(ts->tt).jd.value(), ts->delta_t.seconds);
+    return 0;
+  }
   std::printf("civil   = %s\n", format_civil(ts->tt.jd.value(), zone).c_str());
   std::printf("UTC  jd = %.6f\n", ts->jd_utc);
   std::printf("leap seconds (TAI-UTC) = %.0f s\n", ts->leap_seconds);
@@ -215,6 +270,7 @@ int run_constant(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
   const auto& consts = eph->constants();
+  const bool json = a.get<bool>("--json");
   const auto names = a.get<std::vector<std::string>>("name");
 
   if (names.empty()) {  // no names given -> list every constant, sorted by name
@@ -222,6 +278,16 @@ int run_constant(const argparse::ArgumentParser& a) {
                                                     consts.entries().end());
     std::sort(all.begin(), all.end(),
               [](const auto& x, const auto& y) { return x.first < y.first; });
+    if (json) {
+      std::printf("{");
+      bool first = true;
+      for (const auto& [name, value] : all) {
+        std::printf("%s%s:%.17g", first ? "" : ",", jstr(name).c_str(), value);
+        first = false;
+      }
+      std::printf("}\n");
+      return 0;
+    }
     for (const auto& [name, value] : all)
       std::printf("%-10s = %.17g\n", name.c_str(), value);
     std::fprintf(stderr, "(%zu constants; see docs/constants.md)\n", all.size());
@@ -229,6 +295,20 @@ int run_constant(const argparse::ArgumentParser& a) {
   }
 
   int missing = 0;
+  if (json) {
+    std::printf("{");
+    bool first = true;
+    for (const auto& name : names) {
+      const auto v = consts.get(name);
+      if (!v) ++missing;
+      std::printf("%s%s:", first ? "" : ",", jstr(name).c_str());
+      if (v) std::printf("%.17g", *v);
+      else std::printf("null");
+      first = false;
+    }
+    std::printf("}\n");
+    return missing ? 1 : 0;
+  }
   for (const auto& name : names) {
     if (auto v = consts.get(name))
       std::printf("%-10s = %.17g\n", name.c_str(), *v);
@@ -252,6 +332,15 @@ int run_state(const argparse::ArgumentParser& a) {
   if (!ts) return 2;
   auto st = eph->state(*body, *center, tdb_from_tt(ts->tt), Units::au);
   if (!st) { std::fprintf(stderr, "error: %s\n", std::string(to_string(st.error())).c_str()); return 1; }
+  if (a.get<bool>("--json")) {
+    std::printf("{\"body\":%s,\"center\":%s,\"jd_tdb\":%.9f,\"units\":\"au\","
+                "\"position\":[%.12e,%.12e,%.12e],"
+                "\"velocity\":[%.12e,%.12e,%.12e]}\n",
+                jstr(to_string(*body)).c_str(), jstr(to_string(*center)).c_str(),
+                tdb_from_tt(ts->tt).jd.value(), st->position[0], st->position[1],
+                st->position[2], st->velocity[0], st->velocity[1], st->velocity[2]);
+    return 0;
+  }
   std::printf("position (AU)     : % .12e % .12e % .12e\n",
               st->position[0], st->position[1], st->position[2]);
   std::printf("velocity (AU/day) : % .12e % .12e % .12e\n",
@@ -280,6 +369,16 @@ int run_place(const argparse::ArgumentParser& a) {
     sky = place(*eph, *body, ts->tt, ts->delta_t, sys, acc);
   }
   if (!sky) { std::fprintf(stderr, "error: %s\n", std::string(to_string(sky.error())).c_str()); return 1; }
+  if (a.get<bool>("--json")) {
+    std::printf("{\"body\":%s,\"coord\":%s,\"accuracy\":%s,\"ra_hours\":%.9f,"
+                "\"dec_deg\":%.9f,\"distance_au\":%.9f,"
+                "\"radial_velocity_km_s\":%.6f}\n",
+                jstr(to_string(*body)).c_str(),
+                jstr(a.get<std::string>("--coord")).c_str(),
+                jstr(a.get<std::string>("--accuracy")).c_str(), sky->ra_hours,
+                sky->dec_deg, sky->distance_au, sky->radial_velocity_km_s);
+    return 0;
+  }
   std::printf("RA  = %.6f h\n", sky->ra_hours);
   std::printf("Dec = %.6f deg\n", sky->dec_deg);
   std::printf("dist = %.9f AU\n", sky->distance_au);
@@ -299,8 +398,21 @@ int run_sky(const argparse::ArgumentParser& a) {
     if (auto o = parse_observer(*os)) obs = *o;
     else { std::fprintf(stderr, "error: bad --observer\n"); return 2; }
   }
-  std::printf("%-8s %12s %13s %16s %11s %11s\n", "Object", "RA(h)", "Dec(deg)",
-              "Dist(AU)", "Alt(deg)", "Az(deg)");
+  const bool json = a.get<bool>("--json");
+  bool first = true;
+  auto jrow = [&](std::string_view name, double ra, double dec, double dist,
+                  double alt, double az) {
+    std::printf("%s{\"object\":%s,\"ra_hours\":%.6f,\"dec_deg\":%.6f,"
+                "\"distance_au\":%.9g,\"altitude_deg\":%.4f,\"azimuth_deg\":%.4f}",
+                first ? "" : ",", jstr(name).c_str(), ra, dec, dist, alt, az);
+    first = false;
+  };
+  if (json)
+    std::printf("{\"observer\":[%.7g,%.7g,%.7g],\"objects\":[",
+                obs.latitude_deg, obs.longitude_deg, obs.height_m);
+  else
+    std::printf("%-8s %12s %13s %16s %11s %11s\n", "Object", "RA(h)", "Dec(deg)",
+                "Dist(AU)", "Alt(deg)", "Az(deg)");
   const Point bodies[] = {Point::mercury, Point::venus,  Point::mars,
                           Point::jupiter, Point::saturn, Point::uranus,
                           Point::neptune, Point::pluto,  Point::sun,
@@ -311,19 +423,30 @@ int run_sky(const argparse::ArgumentParser& a) {
     if (!sky) continue;
     auto hor = equ2hor(ts->ut1, ts->delta_t, Accuracy::full, PolarMotion{}, obs,
                        sky->ra_hours, sky->dec_deg, Refraction::from_location);
-    std::printf("%-8s %12.6f %13.6f %16.9f %11.4f %11.4f\n",
-                std::string(to_string(b)).c_str(), sky->ra_hours, sky->dec_deg,
-                sky->distance_au, 90.0 - hor.zenith_distance_deg, hor.azimuth_deg);
+    const double alt = 90.0 - hor.zenith_distance_deg;
+    if (json)
+      jrow(to_string(b), sky->ra_hours, sky->dec_deg, sky->distance_au, alt,
+           hor.azimuth_deg);
+    else
+      std::printf("%-8s %12.6f %13.6f %16.9f %11.4f %11.4f\n",
+                  std::string(to_string(b)).c_str(), sky->ra_hours, sky->dec_deg,
+                  sky->distance_au, alt, hor.azimuth_deg);
   }
   const Star polaris{2.5303010278, 89.2641094444, 3442.95, -11.8, 7.56, -17.4};
   if (auto sky = place(*eph, polaris, ts->tt, ts->delta_t, obs,
                        CoordSys::equator_equinox, Accuracy::full)) {
     auto hor = equ2hor(ts->ut1, ts->delta_t, Accuracy::full, PolarMotion{}, obs,
                        sky->ra_hours, sky->dec_deg, Refraction::from_location);
-    std::printf("%-8s %12.6f %13.6f %16.6e %11.4f %11.4f\n", "Polaris",
-                sky->ra_hours, sky->dec_deg, parallax_distance_au(polaris),
-                90.0 - hor.zenith_distance_deg, hor.azimuth_deg);
+    const double alt = 90.0 - hor.zenith_distance_deg;
+    if (json)
+      jrow("Polaris", sky->ra_hours, sky->dec_deg, parallax_distance_au(polaris),
+           alt, hor.azimuth_deg);
+    else
+      std::printf("%-8s %12.6f %13.6f %16.6e %11.4f %11.4f\n", "Polaris",
+                  sky->ra_hours, sky->dec_deg, parallax_distance_au(polaris),
+                  alt, hor.azimuth_deg);
   }
+  if (json) std::printf("]}\n");
   return 0;
 }
 
@@ -348,12 +471,26 @@ int run_rise(const argparse::ArgumentParser& a) {
   auto ts = parse_utc(a.get<std::string>("datetime"), zone);
   if (!ts) return 2;
   const auto dir = a.get<bool>("--back") ? Direction::backward : Direction::forward;
+  const bool json = a.get<bool>("--json");
+  bool first = true;
+  if (json) std::printf("[");
   for (auto e : horizon_events(*eph, *body, *obs, ts->tt, parse_horizon(a.get<std::string>("--horizon")),
                                dir, ts->delta_t) |
-                    std::views::take(a.get<int>("--count")))
-    std::printf("%-11s %s  alt=%8.4f  az=%9.4f\n", event_name(e.kind),
-                format_civil(e.time.jd.value(), zone).c_str(), e.altitude_deg,
-                e.azimuth_deg);
+                    std::views::take(a.get<int>("--count"))) {
+    if (json) {
+      std::printf("%s{\"kind\":%s,\"time\":%s,\"jd_tt\":%.9f,"
+                  "\"altitude_deg\":%.4f,\"azimuth_deg\":%.4f}", first ? "" : ",",
+                  jstr(event_name(e.kind)).c_str(),
+                  jstr(format_iso(e.time.jd.value(), zone)).c_str(),
+                  e.time.jd.value(), e.altitude_deg, e.azimuth_deg);
+      first = false;
+    } else {
+      std::printf("%-11s %s  alt=%8.4f  az=%9.4f\n", event_name(e.kind),
+                  format_civil(e.time.jd.value(), zone).c_str(), e.altitude_deg,
+                  e.azimuth_deg);
+    }
+  }
+  if (json) std::printf("]\n");
   return 0;
 }
 
@@ -367,10 +504,23 @@ int run_seasons(const argparse::ArgumentParser& a) {
   const auto dir = a.get<bool>("--back") ? Direction::backward : Direction::forward;
   static const char* names[] = {"March equinox", "June solstice",
                                 "September equinox", "December solstice"};
+  const bool json = a.get<bool>("--json");
+  bool first = true;
+  if (json) std::printf("[");
   for (auto m : tropical_moments(*eph, ts->tt, dir) |
-                    std::views::take(a.get<int>("--count")))
-    std::printf("%-18s %s\n", names[static_cast<int>(m.season)],
-                format_civil(m.time.jd.value(), zone).c_str());
+                    std::views::take(a.get<int>("--count"))) {
+    if (json) {
+      std::printf("%s{\"season\":%s,\"time\":%s,\"jd_tt\":%.9f}", first ? "" : ",",
+                  jstr(names[static_cast<int>(m.season)]).c_str(),
+                  jstr(format_iso(m.time.jd.value(), zone)).c_str(),
+                  m.time.jd.value());
+      first = false;
+    } else {
+      std::printf("%-18s %s\n", names[static_cast<int>(m.season)],
+                  format_civil(m.time.jd.value(), zone).c_str());
+    }
+  }
+  if (json) std::printf("]\n");
   return 0;
 }
 
@@ -386,13 +536,25 @@ int run_apsides(const argparse::ArgumentParser& a) {
   if (!ts) return 2;
   const auto dir = a.get<bool>("--back") ? Direction::backward : Direction::forward;
   const bool geo = (*center == Point::earth);
+  const bool json = a.get<bool>("--json");
+  bool first = true;
+  if (json) std::printf("[");
   for (auto ap : apsides(*eph, *body, *center, ts->tt, dir) |
                      std::views::take(a.get<int>("--count"))) {
     const char* name = (ap.kind == Apsis::periapsis) ? (geo ? "perigee" : "perihelion")
                                                       : (geo ? "apogee" : "aphelion");
-    std::printf("%-10s %s  dist=%.7f AU\n", name,
-                format_civil(ap.time.jd.value(), zone).c_str(), ap.distance_au);
+    if (json) {
+      std::printf("%s{\"kind\":%s,\"time\":%s,\"jd_tt\":%.9f,\"distance_au\":%.9f}",
+                  first ? "" : ",", jstr(name).c_str(),
+                  jstr(format_iso(ap.time.jd.value(), zone)).c_str(),
+                  ap.time.jd.value(), ap.distance_au);
+      first = false;
+    } else {
+      std::printf("%-10s %s  dist=%.7f AU\n", name,
+                  format_civil(ap.time.jd.value(), zone).c_str(), ap.distance_au);
+    }
   }
+  if (json) std::printf("]\n");
   return 0;
 }
 
@@ -417,6 +579,7 @@ int run_moon(const argparse::ArgumentParser& a) {
   if (!zone) return 2;
   auto ts = parse_utc(a.get<std::string>("datetime"), zone);
   if (!ts) return 2;
+  const bool json = a.get<bool>("--json");
 
   // Stream mode (-n/--back present): principal phase moments, forward or back.
   // Phase moments are geocentric, so --observer does not apply here.
@@ -426,10 +589,22 @@ int run_moon(const argparse::ArgumentParser& a) {
     const auto dir = a.get<bool>("--back") ? Direction::backward : Direction::forward;
     static const char* names[] = {"new moon", "first quarter", "full moon",
                                   "last quarter"};
+    bool first = true;
+    if (json) std::printf("[");
     for (auto m : lunar_phases(*eph, ts->tt, dir) |
-                      std::views::take(a.get<int>("--count")))
-      std::printf("%-14s %s\n", names[static_cast<int>(m.phase)],
-                  format_civil(m.time.jd.value(), zone).c_str());
+                      std::views::take(a.get<int>("--count"))) {
+      if (json) {
+        std::printf("%s{\"phase\":%s,\"time\":%s,\"jd_tt\":%.9f}", first ? "" : ",",
+                    jstr(names[static_cast<int>(m.phase)]).c_str(),
+                    jstr(format_iso(m.time.jd.value(), zone)).c_str(),
+                    m.time.jd.value());
+        first = false;
+      } else {
+        std::printf("%-14s %s\n", names[static_cast<int>(m.phase)],
+                    format_civil(m.time.jd.value(), zone).c_str());
+      }
+    }
+    if (json) std::printf("]\n");
     return 0;
   }
 
@@ -491,6 +666,16 @@ int run_moon(const argparse::ArgumentParser& a) {
   equ_to_ecl_of_date(ts->tt.jd.value(), ra_s, dec_s, lam_s, bet_s);
   const double age = std::fmod(lam_m - lam_s + 360.0, 360.0);
 
+  if (json) {
+    std::printf("{\"time\":%s,\"mode\":%s,\"phase\":%s,\"illuminated_fraction\":%.6f,"
+                "\"phase_angle_deg\":%.4f,\"elongation_deg\":%.4f,\"age_deg\":%.4f,"
+                "\"distance_km\":%.3f}\n",
+                jstr(format_iso(ts->tt.jd.value(), zone)).c_str(),
+                jstr(topo ? "topocentric" : "geocentric").c_str(),
+                jstr(moon_phase_name(age)).c_str(), illum, i_deg, elong, age,
+                moon_au * eph->header().au_km);
+    return 0;
+  }
   std::printf("Moon phase @ %s (%s)\n", format_civil(ts->tt.jd.value(), zone).c_str(),
               topo ? "topocentric" : "geocentric, geometric");
   std::printf("  phase       : %s\n", moon_phase_name(age));
@@ -523,6 +708,9 @@ int main(int argc, char** argv) {
     p.add_argument("--timezone").default_value(std::string{"utc"})
         .help("civil-time zone for input and output: an IANA name "
               "(e.g. America/Los_Angeles), 'local', or 'utc'");
+  };
+  auto with_json = [](argparse::ArgumentParser& p) {
+    p.add_argument("--json").flag().help("emit machine-readable JSON instead of text");
   };
 
   argparse::ArgumentParser info("info");
@@ -606,6 +794,11 @@ int main(int argc, char** argv) {
   moon.add_argument("--back").flag().help("stream mode: search backward in time");
   with_timezone(moon);
   with_ephem(moon);
+
+  for (argparse::ArgumentParser* p :
+       {&info, &time_cmd, &constant, &state, &place_cmd, &sky, &rise, &seasons,
+        &apsides_cmd, &moon})
+    with_json(*p);
 
   program.add_subparser(info);
   program.add_subparser(time_cmd);
