@@ -185,6 +185,8 @@ build/cli/astro seasons 2026-01-01 -n 4
 build/cli/astro apsides earth 2026-01-01 -n 4
 build/cli/astro moon    now                                     # phase, illuminated %
 build/cli/astro moon    now --observer 47.61,-122.33,10         # topocentric
+build/cli/astro moon    now -n 4                                # next new/quarters/full
+build/cli/astro moon    now --back -n 4                         # previous phase moments
 ```
 
 Any datetime argument also accepts the literal `now` for the current system time

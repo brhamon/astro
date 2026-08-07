@@ -362,6 +362,21 @@ int run_moon(const argparse::ArgumentParser& a) {
   auto ts = parse_utc(a.get<std::string>("datetime"));
   if (!ts) { std::fprintf(stderr, "error: bad datetime\n"); return 2; }
 
+  // Stream mode (-n/--back present): principal phase moments, forward or back.
+  // Phase moments are geocentric, so --observer does not apply here.
+  if (a.is_used("--count") || a.get<bool>("--back")) {
+    if (a.is_used("--observer"))
+      std::fprintf(stderr, "note: --observer ignored; phase moments are geocentric\n");
+    const auto dir = a.get<bool>("--back") ? Direction::backward : Direction::forward;
+    static const char* names[] = {"new moon", "first quarter", "full moon",
+                                  "last quarter"};
+    for (auto m : lunar_phases(*eph, ts->tt, dir) |
+                      std::views::take(a.get<int>("--count")))
+      std::printf("%-14s %s\n", names[static_cast<int>(m.phase)],
+                  tt_to_utc(m.time.jd.value()).c_str());
+    return 0;
+  }
+
   // Moon and Sun vectors (AU) in a common frame, plus apparent RA/Dec for the
   // ecliptic-longitude elongation. Topocentric (apparent) when --observer is
   // given; otherwise geometric geocentric.
@@ -513,10 +528,13 @@ int main(int argc, char** argv) {
   with_ephem(apsides_cmd);
 
   argparse::ArgumentParser moon("moon");
-  moon.add_description("Moon phase: illuminated fraction, phase angle, elongation, named phase.");
+  moon.add_description("Moon phase snapshot, or (with -n) a stream of phase moments.");
   moon.add_argument("datetime").help("UTC or 'now'");
   moon.add_argument("--observer")
       .help("lat,lon,height (deg,deg,m); topocentric if given, else geometric geocentric");
+  moon.add_argument("-n", "--count").scan<'i', int>().default_value(4)
+      .help("stream mode: report this many phase moments (new/quarters/full)");
+  moon.add_argument("--back").flag().help("stream mode: search backward in time");
   with_ephem(moon);
 
   program.add_subparser(info);
