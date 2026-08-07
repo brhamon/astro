@@ -20,8 +20,25 @@ int g_fail = 0;
 }  // namespace
 
 int main() {
+  // IAU name -> HIP crosswalk: a bundled table, so this needs no data file.
+  CHECK(astro::hip_for_name("Vega") == 91262);
+  CHECK(astro::hip_for_name("vega") == 91262);          // case-insensitive
+  CHECK(astro::hip_for_name("  Sirius ") == 32349);     // trimmed
+  CHECK(astro::hip_for_name("Polaris") == 11767);
+  CHECK(astro::hip_for_name("Rigil Kentaurus") == 71683);  // multi-word name
+  CHECK(!astro::hip_for_name("Nonesuch").has_value());
+
+  // Reverse lookup returns the canonical IAU name (or nothing for unnamed HIPs).
+  CHECK(astro::name_for_hip(91262) == "Vega");
+  CHECK(astro::name_for_hip(54061) == "Dubhe");
+  CHECK(!astro::name_for_hip(2).has_value());
+
   const char* path = std::getenv("LIBASTRO_CATALOG");
-  if (!path) { std::fprintf(stderr, "SKIP catalog: set LIBASTRO_CATALOG\n"); return 0; }
+  if (!path) {
+    std::fprintf(stderr, "SKIP catalog file (LIBASTRO_CATALOG unset); "
+                         "name crosswalk: %d failures\n", g_fail);
+    return g_fail == 0 ? 0 : 1;
+  }
   auto cat = astro::StarCatalog::load_hipparcos(path);
   if (!cat) { std::fprintf(stderr, "FAIL catalog: load\n"); return 1; }
 
@@ -54,6 +71,11 @@ int main() {
   const astro::CatalogStar* vega = cat->by_hip(91262);   // Vega
   CHECK(vega != nullptr);
   if (vega) CHECK(std::fabs(vega->hp_mag - 0.087) < 0.02);
+
+  // by_name resolves through the crosswalk to the same record.
+  CHECK(cat->by_name("vega") == vega);
+  CHECK(cat->by_name("Betelgeuse") != nullptr);
+  CHECK(cat->by_name("Nonesuch") == nullptr);
 
   std::fprintf(stderr, "catalog: %zu stars; Sirius/Vega OK; %d failures\n",
                cat->size(), g_fail);
