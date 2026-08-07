@@ -1,5 +1,7 @@
 #include "astro/catalog.hpp"
 
+#include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <cmath>
 #include <fstream>
@@ -61,11 +63,44 @@ std::optional<int> as_int(std::string_view v) {
   return out;
 }
 
+// IAU proper-name <-> HIP crosswalk (generated, sorted by lowercased name).
+struct NamedStar { std::string_view name; std::string_view display; int hip; };
+#include "star_names.inc"  // constexpr NamedStar kStarNames[]
+
+std::string lower_trim(std::string_view s) {
+  while (!s.empty() && s.front() == ' ') s.remove_prefix(1);
+  while (!s.empty() && s.back() == ' ') s.remove_suffix(1);
+  std::string out(s);
+  for (char& c : out)
+    c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+  return out;
+}
+
 }  // namespace
 
 const CatalogStar* StarCatalog::by_hip(int hip) const {
   if (auto it = by_hip_.find(hip); it != by_hip_.end()) return &stars_[it->second];
   return nullptr;
+}
+
+std::optional<int> hip_for_name(std::string_view name) {
+  const std::string key = lower_trim(name);
+  const auto it = std::lower_bound(
+      std::begin(kStarNames), std::end(kStarNames), key,
+      [](const NamedStar& e, const std::string& k) { return e.name < k; });
+  if (it != std::end(kStarNames) && it->name == key) return it->hip;
+  return std::nullopt;
+}
+
+const CatalogStar* StarCatalog::by_name(std::string_view name) const {
+  if (auto h = hip_for_name(name)) return by_hip(*h);
+  return nullptr;
+}
+
+std::optional<std::string_view> name_for_hip(int hip) {
+  for (const NamedStar& e : kStarNames)
+    if (e.hip == hip) return e.display;
+  return std::nullopt;
 }
 
 std::expected<StarCatalog, EphError> StarCatalog::load_hipparcos(

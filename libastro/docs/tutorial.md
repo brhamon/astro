@@ -188,7 +188,8 @@ build/cli/astro moon    now                                     # phase, illumin
 build/cli/astro moon    now --observer 47.61,-122.33,10         # topocentric
 build/cli/astro moon    now -n 4                                # next new/quarters/full
 build/cli/astro moon    now --back -n 4                         # previous phase moments
-build/cli/astro star    32349 now --observer 47.61,-122.33,10   # Sirius (needs fetch_catalog.sh)
+build/cli/astro star    sirius now --observer 47.61,-122.33,10  # by name (needs fetch_catalog.sh)
+build/cli/astro star    91262 now                               # or by HIP number (Vega)
 ```
 
 Any command that takes a civil time also accepts `--timezone` (an IANA name,

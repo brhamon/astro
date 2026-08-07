@@ -5,6 +5,8 @@
 #include <expected>
 #include <filesystem>
 #include <limits>
+#include <optional>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -45,10 +47,23 @@ class StarCatalog {
   // Look up by Hipparcos number; nullptr if not present.
   const CatalogStar* by_hip(int hip) const;
 
+  // Look up by IAU proper name (e.g. "Vega", case-insensitive), via
+  // hip_for_name(); nullptr if the name is unknown or absent from the catalogue.
+  const CatalogStar* by_name(std::string_view name) const;
+
  private:
   std::vector<CatalogStar> stars_;
   std::unordered_map<int, std::size_t> by_hip_;  // HIP -> index into stars_
 };
+
+// Resolve an IAU proper star name (e.g. "Vega", case-insensitive) to its
+// Hipparcos number, using the bundled IAU Catalog of Star Names. Returns
+// nullopt if the name is not an IAU-catalogued star with a HIP number.
+std::optional<int> hip_for_name(std::string_view name);
+
+// The reverse: the canonical IAU proper name for a Hipparcos number (e.g. 91262
+// -> "Vega"), or nullopt if that star has no IAU name.
+std::optional<std::string_view> name_for_hip(int hip);
 
 }  // namespace astro
 

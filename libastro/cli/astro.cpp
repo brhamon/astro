@@ -695,9 +695,15 @@ int run_star(const argparse::ArgumentParser& a) {
   const auto [p, ec] =
       std::from_chars(ident.data(), ident.data() + ident.size(), hip);
   if (ec != std::errc{} || p != ident.data() + ident.size()) {
-    std::fprintf(stderr, "error: '%s' is not a HIP number "
-                         "(name lookup is not yet supported)\n", ident.c_str());
-    return 2;
+    // Not a HIP number -> try an IAU proper name (e.g. "Vega").
+    if (auto h = hip_for_name(ident)) {
+      hip = *h;
+    } else {
+      std::fprintf(stderr,
+                   "error: '%s' is not a HIP number or a known IAU star name\n",
+                   ident.c_str());
+      return 2;
+    }
   }
 
   const std::string cpath = catalog_path(a);
@@ -733,8 +739,11 @@ int run_star(const argparse::ArgumentParser& a) {
     az = hor.azimuth_deg;
   }
 
+  const auto iau = name_for_hip(cs->hip);  // canonical IAU proper name, if any
   if (a.get<bool>("--json")) {
-    std::printf("{\"hip\":%d,\"hp_mag\":", cs->hip);
+    std::printf("{\"hip\":%d", cs->hip);
+    if (iau) std::printf(",\"iau_name\":%s", jstr(*iau).c_str());
+    std::printf(",\"hp_mag\":");
     if (std::isnan(cs->hp_mag)) std::printf("null"); else std::printf("%.3f", cs->hp_mag);
     std::printf(",\"bv\":");
     if (std::isnan(cs->bv)) std::printf("null"); else std::printf("%.3f", cs->bv);
@@ -748,6 +757,7 @@ int run_star(const argparse::ArgumentParser& a) {
     return 0;
   }
   std::printf("HIP %d", cs->hip);
+  if (iau) std::printf("  IAU %.*s", static_cast<int>(iau->size()), iau->data());
   if (!std::isnan(cs->hp_mag)) std::printf("  Hp=%.2f", cs->hp_mag);
   if (!std::isnan(cs->bv)) std::printf("  B-V=%.2f", cs->bv);
   std::printf("\n");
@@ -821,8 +831,8 @@ int main(int argc, char** argv) {
   with_ephem(place_cmd);
 
   argparse::ArgumentParser star("star");
-  star.add_description("Place a Hipparcos catalogue star by HIP number.");
-  star.add_argument("id").help("Hipparcos number (HIP)");
+  star.add_description("Place a Hipparcos catalogue star by HIP number or IAU name.");
+  star.add_argument("id").help("Hipparcos number (HIP) or IAU name (e.g. Vega)");
   star.add_argument("datetime").help("UTC or 'now'");
   star.add_argument("--observer").help("lat,lon,height (deg,deg,m); adds alt/az");
   star.add_argument("--coord").default_value(std::string{"apparent"})

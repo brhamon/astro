@@ -50,8 +50,9 @@ generators in `test/gen/` are the oracles; see `test/`).
   takes `--json`. ✅
 - **Star catalogue** — `StarCatalog::load_hipparcos` loads the Hipparcos
   re-reduction (van Leeuwen 2007, 117955 stars, `scripts/fetch_catalog.sh`),
-  converts its radian J1991.25 positions to J2000.0, and feeds `place()`;
-  `astro star <HIP>` places one. ✅
+  converts its radian J1991.25 positions to J2000.0, and feeds `place()`. A
+  bundled IAU name → HIP crosswalk resolves proper names, so `astro star vega`
+  (or `astro star 91262`) places a star. ✅
 
 - **Packaging** — installs as a CMake package: `find_package(astro CONFIG)`
   gives you the `astro::astro` target (see
@@ -203,7 +204,7 @@ include/astro/            public headers (Layer 0 + Layer 2 + Layer 3 + vocabula
 src/                      implementations
 examples/                 planets: end-to-end demo over the public API
 cli/                      astro: multi-command CLI over the public API
-tools/                    extract_nutation_tables.py (IAU 2000 series -> src/)
+tools/                    extract_nutation_tables.py, extract_star_names.py (-> src/*.inc)
 scripts/                  fetch_ephemeris.sh, fetch_catalog.sh, vendor_mdspan.sh
 data/                     fetched ephemeris + star catalogue (gitignored)
 test/
