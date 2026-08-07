@@ -189,6 +189,16 @@ build/cli/astro moon    now -n 4                                # next new/quart
 build/cli/astro moon    now --back -n 4                         # previous phase moments
 ```
 
+Any command that takes a civil time also accepts `--timezone` (an IANA name,
+`local`, or `utc`), which controls both the input datetime and the output times:
+
+```sh
+build/cli/astro moon    now --timezone America/Los_Angeles      # times shown in Pacific
+build/cli/astro seasons 2026-01-01 -n 4 --timezone Asia/Shanghai
+build/cli/astro rise    sun "2026-08-05 20:00" --observer 47.61,-122.33,10 \
+                        --timezone local                        # local civil in and out
+```
+
 Any datetime argument also accepts the literal `now` for the current system time
 in UTC — e.g. `astro sky now --observer 47.61,-122.33,10` or `astro rise sun now
 --observer 47.61,-122.33,10`.

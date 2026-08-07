@@ -260,9 +260,17 @@ double sun_apparent_longitude(const Ephemeris&, TtInstant t);         // [0,360)
 ## The `astro` CLI
 
 One tool over the whole surface (built with `-DLIBASTRO_BUILD_CLI=ON`, default
-for a top-level build). Times are civil UTC (`YYYY-MM-DD[THH:MM[:SS]]`), or the
-literal `now` for the current system time in UTC; the ephemeris is located via
-`--ephemeris`, `$LIBASTRO_EPHEMERIS`, or `./data/JPLEPH`.
+for a top-level build). Times are civil (`YYYY-MM-DD[THH:MM[:SS]]`), or the
+literal `now`; the ephemeris is located via `--ephemeris`,
+`$LIBASTRO_EPHEMERIS`, or `./data/JPLEPH`.
+
+**`--timezone <zone>`** (on every time-bearing command) sets the zone for *both*
+the input datetime and the displayed output times: an IANA name
+(`America/Los_Angeles`, `Asia/Shanghai`), `local` (the host zone), or `utc`
+(default). Uses the C++20 `std::chrono` tz database, so it is DST-aware; an
+impossible or ambiguous local input time (a DST gap or overlap) is reported as
+an error rather than guessed. `now` is unaffected by the zone (it is an instant)
+but is displayed in it.
 
 | Command | Purpose |
 |---------|---------|

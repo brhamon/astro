@@ -1,6 +1,7 @@
 // astro -- a multi-command command-line tool exercising the libastro surface:
 // ephemeris state and constants, place() (planets + a star), equ2hor, and the
-// phenomena streams (rise/transit/set, seasons, apsides). Time is UTC.
+// phenomena streams (rise/transit/set, seasons, apsides). Civil time is UTC by
+// default; --timezone <IANA name|local|utc> controls both input and output.
 //
 //   astro info
 //   astro time    2026-07-11T17:24
@@ -16,10 +17,11 @@
 #include <argparse/argparse.hpp>
 #include <algorithm>
 #include <cctype>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
-#include <ctime>
+#include <format>
 #include <iostream>
 #include <optional>
 #include <ranges>
@@ -60,22 +62,58 @@ std::optional<Ephemeris> open_ephem(const argparse::ArgumentParser& p) {
   return std::move(*e);
 }
 
-// UTC "YYYY-MM-DD[ T]HH:MM[:SS]", or the literal "now" (current system time in
-// UTC) -> time scales (with a fixed observer 0 UT1-UTC).
-std::optional<TimeScaleSet> parse_utc(const std::string& s) {
+// Resolve --timezone (an IANA name, or the keywords "local"/"utc") to a chrono
+// time zone. Prints an error and returns nullptr if the name is unknown.
+const std::chrono::time_zone* resolve_zone(const argparse::ArgumentParser& p) {
+  const std::string tz = p.get<std::string>("--timezone");
+  const std::string key = lower(tz);
+  try {
+    if (key == "utc") return std::chrono::locate_zone("Etc/UTC");
+    if (key == "local") return std::chrono::current_zone();
+    return std::chrono::locate_zone(tz);  // IANA names are case-sensitive
+  } catch (const std::exception& e) {
+    std::fprintf(stderr, "error: unknown timezone '%s' (%s)\n", tz.c_str(), e.what());
+    return nullptr;
+  }
+}
+
+// A civil datetime interpreted in `zone` (or the literal "now") -> UTC time
+// scales. On a parse failure, or an impossible/ambiguous local time (DST
+// transitions), prints an error and returns nullopt.
+std::optional<TimeScaleSet> parse_utc(const std::string& s,
+                                      const std::chrono::time_zone* zone) {
+  using namespace std::chrono;
   if (lower(s) == "now") {
-    const std::time_t t = std::time(nullptr);
-    std::tm g{};
-    gmtime_r(&t, &g);  // system time -> broken-down UTC
-    return utc_time_scales(g.tm_year + 1900, g.tm_mon + 1, g.tm_mday,
-                           g.tm_hour + g.tm_min / 60.0 + g.tm_sec / 3600.0);
+    const double unix =
+        duration<double>(system_clock::now().time_since_epoch()).count();
+    return utc_time_scales(2440587.5 + unix / 86400.0);
   }
   int y = 0, mo = 0, d = 0, h = 0, mi = 0;
   double se = 0.0;
   const int n = std::sscanf(s.c_str(), "%d-%d-%d%*[ T]%d:%d:%lf", &y, &mo, &d,
                             &h, &mi, &se);
-  if (n < 3) return std::nullopt;
-  return utc_time_scales(y, mo, d, h + mi / 60.0 + se / 3600.0);
+  if (n < 3) {
+    std::fprintf(stderr, "error: cannot parse datetime '%s' "
+                         "(want YYYY-MM-DD[THH:MM[:SS]] or 'now')\n", s.c_str());
+    return std::nullopt;
+  }
+  double whole = 0.0;
+  const double frac = std::modf(se, &whole);
+  try {
+    const sys_days sd = year{y} / month{static_cast<unsigned>(mo)} /
+                        day{static_cast<unsigned>(d)};
+    const local_seconds lt = local_days{sd.time_since_epoch()} + hours{h} +
+                             minutes{mi} + seconds{static_cast<long long>(whole)};
+    const sys_seconds st = zoned_time{zone, lt}.get_sys_time();
+    const double unix = static_cast<double>(st.time_since_epoch().count()) + frac;
+    return utc_time_scales(2440587.5 + unix / 86400.0);
+  } catch (const nonexistent_local_time& e) {
+    std::fprintf(stderr, "error: %s\n", e.what());
+    return std::nullopt;
+  } catch (const ambiguous_local_time& e) {
+    std::fprintf(stderr, "error: %s\n", e.what());
+    return std::nullopt;
+  }
 }
 
 std::optional<Point> parse_body(const std::string& name) {
@@ -130,18 +168,15 @@ Horizon parse_horizon(const std::string& s) {
   return Horizon::star;
 }
 
-// TT Julian date -> a printable UTC calendar string (approximate: ignores
-// UT1-UTC, good to < 1 s).
-std::string tt_to_utc(double tt_jd) {
+// TT Julian date -> a civil timestamp rendered in `zone` (e.g. "... PDT" or
+// "... UTC"), to the nearest second (ignores UT1-UTC, good to < 1 s).
+std::string format_civil(double tt_jd, const std::chrono::time_zone* zone) {
+  using namespace std::chrono;
   const double leap = tai_minus_utc(tt_jd);
-  const auto c = calendar_date(tt_jd - (leap + 32.184) / 86400.0);
-  const int hh = static_cast<int>(c.hour);
-  const int mm = static_cast<int>((c.hour - hh) * 60.0);
-  const int ss = static_cast<int>(((c.hour - hh) * 60.0 - mm) * 60.0 + 0.5);
-  char buf[40];
-  std::snprintf(buf, sizeof buf, "%04d-%02d-%02d %02d:%02d:%02d UTC", c.year,
-                c.month, c.day, hh, mm, ss);
-  return buf;
+  const double utc_jd = tt_jd - (leap + 32.184) / 86400.0;
+  const long long unix = std::llround((utc_jd - 2440587.5) * 86400.0);
+  return std::format("{:%Y-%m-%d %H:%M:%S %Z}",
+                     zoned_time{zone, sys_seconds{seconds{unix}}});
 }
 
 // ------------------------------- subcommands -------------------------------
@@ -162,8 +197,11 @@ int run_info(const argparse::ArgumentParser& a) {
 }
 
 int run_time(const argparse::ArgumentParser& a) {
-  auto ts = parse_utc(a.get<std::string>("datetime"));
-  if (!ts) { std::fprintf(stderr, "error: bad datetime\n"); return 2; }
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
+  std::printf("civil   = %s\n", format_civil(ts->tt.jd.value(), zone).c_str());
   std::printf("UTC  jd = %.6f\n", ts->jd_utc);
   std::printf("leap seconds (TAI-UTC) = %.0f s\n", ts->leap_seconds);
   std::printf("TT   jd = %.9f\n", ts->tt.jd.value());
@@ -205,10 +243,13 @@ int run_constant(const argparse::ArgumentParser& a) {
 int run_state(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
   auto body = parse_body(a.get<std::string>("body"));
   auto center = parse_center(a.get<std::string>("--center"));
-  auto ts = parse_utc(a.get<std::string>("datetime"));
-  if (!body || !center || !ts) { std::fprintf(stderr, "error: bad body/center/datetime\n"); return 2; }
+  if (!body || !center) { std::fprintf(stderr, "error: bad body/center\n"); return 2; }
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
   auto st = eph->state(*body, *center, tdb_from_tt(ts->tt), Units::au);
   if (!st) { std::fprintf(stderr, "error: %s\n", std::string(to_string(st.error())).c_str()); return 1; }
   std::printf("position (AU)     : % .12e % .12e % .12e\n",
@@ -221,9 +262,12 @@ int run_state(const argparse::ArgumentParser& a) {
 int run_place(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
   auto body = parse_body(a.get<std::string>("body"));
-  auto ts = parse_utc(a.get<std::string>("datetime"));
-  if (!body || !ts) { std::fprintf(stderr, "error: bad body/datetime\n"); return 2; }
+  if (!body) { std::fprintf(stderr, "error: bad body\n"); return 2; }
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
   const CoordSys sys = parse_coord(a.get<std::string>("--coord"));
   const Accuracy acc = parse_accuracy(a.get<std::string>("--accuracy"));
 
@@ -246,8 +290,10 @@ int run_place(const argparse::ArgumentParser& a) {
 int run_sky(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
-  auto ts = parse_utc(a.get<std::string>("datetime"));
-  if (!ts) { std::fprintf(stderr, "error: bad datetime\n"); return 2; }
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
   SurfaceObserver obs{47.6096694, -122.340412, 10.0, 15.0, 1026.4};
   if (auto os = a.present<std::string>("--observer")) {
     if (auto o = parse_observer(*os)) obs = *o;
@@ -294,16 +340,19 @@ const char* event_name(EventKind k) {
 int run_rise(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
   auto body = parse_body(a.get<std::string>("body"));
-  auto ts = parse_utc(a.get<std::string>("datetime"));
   auto obs = parse_observer(a.get<std::string>("--observer"));
-  if (!body || !ts || !obs) { std::fprintf(stderr, "error: bad body/datetime/observer\n"); return 2; }
+  if (!body || !obs) { std::fprintf(stderr, "error: bad body/observer\n"); return 2; }
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
   const auto dir = a.get<bool>("--back") ? Direction::backward : Direction::forward;
   for (auto e : horizon_events(*eph, *body, *obs, ts->tt, parse_horizon(a.get<std::string>("--horizon")),
                                dir, ts->delta_t) |
                     std::views::take(a.get<int>("--count")))
     std::printf("%-11s %s  alt=%8.4f  az=%9.4f\n", event_name(e.kind),
-                tt_to_utc(e.time.jd.value()).c_str(), e.altitude_deg,
+                format_civil(e.time.jd.value(), zone).c_str(), e.altitude_deg,
                 e.azimuth_deg);
   return 0;
 }
@@ -311,25 +360,30 @@ int run_rise(const argparse::ArgumentParser& a) {
 int run_seasons(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
-  auto ts = parse_utc(a.get<std::string>("datetime"));
-  if (!ts) { std::fprintf(stderr, "error: bad datetime\n"); return 2; }
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
   const auto dir = a.get<bool>("--back") ? Direction::backward : Direction::forward;
   static const char* names[] = {"March equinox", "June solstice",
                                 "September equinox", "December solstice"};
   for (auto m : tropical_moments(*eph, ts->tt, dir) |
                     std::views::take(a.get<int>("--count")))
     std::printf("%-18s %s\n", names[static_cast<int>(m.season)],
-                tt_to_utc(m.time.jd.value()).c_str());
+                format_civil(m.time.jd.value(), zone).c_str());
   return 0;
 }
 
 int run_apsides(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
   auto body = parse_body(a.get<std::string>("body"));
   auto center = parse_center(a.get<std::string>("--center"));
-  auto ts = parse_utc(a.get<std::string>("datetime"));
-  if (!body || !center || !ts) { std::fprintf(stderr, "error: bad body/center/datetime\n"); return 2; }
+  if (!body || !center) { std::fprintf(stderr, "error: bad body/center\n"); return 2; }
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
   const auto dir = a.get<bool>("--back") ? Direction::backward : Direction::forward;
   const bool geo = (*center == Point::earth);
   for (auto ap : apsides(*eph, *body, *center, ts->tt, dir) |
@@ -337,7 +391,7 @@ int run_apsides(const argparse::ArgumentParser& a) {
     const char* name = (ap.kind == Apsis::periapsis) ? (geo ? "perigee" : "perihelion")
                                                       : (geo ? "apogee" : "aphelion");
     std::printf("%-10s %s  dist=%.7f AU\n", name,
-                tt_to_utc(ap.time.jd.value()).c_str(), ap.distance_au);
+                format_civil(ap.time.jd.value(), zone).c_str(), ap.distance_au);
   }
   return 0;
 }
@@ -359,8 +413,10 @@ const char* moon_phase_name(double age_deg) {
 int run_moon(const argparse::ArgumentParser& a) {
   auto eph = open_ephem(a);
   if (!eph) return 1;
-  auto ts = parse_utc(a.get<std::string>("datetime"));
-  if (!ts) { std::fprintf(stderr, "error: bad datetime\n"); return 2; }
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
 
   // Stream mode (-n/--back present): principal phase moments, forward or back.
   // Phase moments are geocentric, so --observer does not apply here.
@@ -373,7 +429,7 @@ int run_moon(const argparse::ArgumentParser& a) {
     for (auto m : lunar_phases(*eph, ts->tt, dir) |
                       std::views::take(a.get<int>("--count")))
       std::printf("%-14s %s\n", names[static_cast<int>(m.phase)],
-                  tt_to_utc(m.time.jd.value()).c_str());
+                  format_civil(m.time.jd.value(), zone).c_str());
     return 0;
   }
 
@@ -435,7 +491,7 @@ int run_moon(const argparse::ArgumentParser& a) {
   equ_to_ecl_of_date(ts->tt.jd.value(), ra_s, dec_s, lam_s, bet_s);
   const double age = std::fmod(lam_m - lam_s + 360.0, 360.0);
 
-  std::printf("Moon phase @ %s (%s)\n", tt_to_utc(ts->tt.jd.value()).c_str(),
+  std::printf("Moon phase @ %s (%s)\n", format_civil(ts->tt.jd.value(), zone).c_str(),
               topo ? "topocentric" : "geocentric, geometric");
   std::printf("  phase       : %s\n", moon_phase_name(age));
   std::printf("  illuminated : %.1f%%\n", 100.0 * illum);
@@ -462,14 +518,21 @@ int main(int argc, char** argv) {
         .help("number of events");
     p.add_argument("--back").flag().help("search backward in time");
   };
+  // Timezone for civil-time input and output (default utc = today's behavior).
+  auto with_timezone = [](argparse::ArgumentParser& p) {
+    p.add_argument("--timezone").default_value(std::string{"utc"})
+        .help("civil-time zone for input and output: an IANA name "
+              "(e.g. America/Los_Angeles), 'local', or 'utc'");
+  };
 
   argparse::ArgumentParser info("info");
   info.add_description("Show the loaded ephemeris header.");
   with_ephem(info);
 
   argparse::ArgumentParser time_cmd("time");
-  time_cmd.add_description("Convert a UTC instant to TT/UT1/TDB and show leap seconds.");
-  time_cmd.add_argument("datetime").help("UTC, YYYY-MM-DD[THH:MM[:SS]], or 'now'");
+  time_cmd.add_description("Convert a civil instant to TT/UT1/TDB and show leap seconds.");
+  time_cmd.add_argument("datetime").help("YYYY-MM-DD[THH:MM[:SS]] (in --timezone), or 'now'");
+  with_timezone(time_cmd);
 
   argparse::ArgumentParser constant("constant");
   constant.add_description("Look up named ephemeris constants, or list them all.");
@@ -483,6 +546,7 @@ int main(int argc, char** argv) {
   state.add_argument("datetime").help("UTC or 'now'");
   state.add_argument("--center").default_value(std::string{"ssb"})
       .help("ssb | sun | earth | emb");
+  with_timezone(state);
   with_ephem(state);
 
   argparse::ArgumentParser place_cmd("place");
@@ -494,12 +558,14 @@ int main(int argc, char** argv) {
       .help("apparent | gcrs | astrometric | cio");
   place_cmd.add_argument("--accuracy").default_value(std::string{"full"})
       .help("full | reduced");
+  with_timezone(place_cmd);
   with_ephem(place_cmd);
 
   argparse::ArgumentParser sky("sky");
   sky.add_description("Planet+Polaris table (RA/Dec/dist and alt/az) for an observer.");
   sky.add_argument("datetime").help("UTC or 'now'");
   sky.add_argument("--observer").help("lat,lon,height (default: Seattle)");
+  with_timezone(sky);
   with_ephem(sky);
 
   argparse::ArgumentParser rise("rise");
@@ -510,12 +576,14 @@ int main(int argc, char** argv) {
   rise.add_argument("--horizon").default_value(std::string{"star"})
       .help("geometric|star|sun|moon|civil|nautical|astronomical");
   with_stream(rise);
+  with_timezone(rise);
   with_ephem(rise);
 
   argparse::ArgumentParser seasons("seasons");
   seasons.add_description("Equinox/solstice stream.");
-  seasons.add_argument("datetime").help("UTC start, or 'now'");
+  seasons.add_argument("datetime").help("civil start (in --timezone), or 'now'");
   with_stream(seasons);
+  with_timezone(seasons);
   with_ephem(seasons);
 
   argparse::ArgumentParser apsides_cmd("apsides");
@@ -525,6 +593,7 @@ int main(int argc, char** argv) {
   apsides_cmd.add_argument("--center").default_value(std::string{"sun"})
       .help("sun (perihelion/aphelion) | earth (perigee/apogee)");
   with_stream(apsides_cmd);
+  with_timezone(apsides_cmd);
   with_ephem(apsides_cmd);
 
   argparse::ArgumentParser moon("moon");
@@ -535,6 +604,7 @@ int main(int argc, char** argv) {
   moon.add_argument("-n", "--count").scan<'i', int>().default_value(4)
       .help("stream mode: report this many phase moments (new/quarters/full)");
   moon.add_argument("--back").flag().help("stream mode: search backward in time");
+  with_timezone(moon);
   with_ephem(moon);
 
   program.add_subparser(info);
