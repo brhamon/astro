@@ -330,7 +330,7 @@ stdout is always clean JSON.
 | `astro state <body> <utc> [--center ssb\|sun\|earth\|emb]` | Layer 0 state vector |
 | `astro place <body> <utc> [--observer lat,lon,h] [--coord apparent\|gcrs\|astrometric\|cio] [--accuracy full\|reduced]` | apparent place |
 | `astro star <HIP\|name> <utc> [--observer lat,lon,h] [--coord …] [--catalog PATH]` | place a Hipparcos catalogue star by HIP number or IAU name (`astro star vega`) |
-| `astro sky <utc> [--observer lat,lon,h]` | solar-system table: Sun, Moon, planets (RA/Dec/dist, alt/az). For stars use `astro star`. |
+| `astro sky <utc> [--observer lat,lon,h] [--include none\|iau\|hipparcos] [--max-mag N] [--min-alt DEG]` | "what's in the sky": Sun, Moon, planets, and optionally catalogue stars. `--include` selects the star set (default `none`); `--max-mag` keeps stars ≤ N (brighter); `--min-alt` keeps objects ≥ DEG above the horizon |
 | `astro rise <body> <utc> --observer lat,lon,h [--horizon …] [-n N] [--back]` | rise/transit/set stream |
 | `astro seasons <utc> [-n N] [--back]` | equinox/solstice stream |
 | `astro apsides <body> <utc> [--center sun\|earth] [-n N] [--back]` | perihelion/aphelion or perigee/apogee |

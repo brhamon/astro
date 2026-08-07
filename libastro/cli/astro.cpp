@@ -25,6 +25,7 @@
 #include <cstdlib>
 #include <format>
 #include <iostream>
+#include <limits>
 #include <optional>
 #include <ranges>
 #include <string>
@@ -53,10 +54,16 @@ std::string ephem_path(const argparse::ArgumentParser& p) {
   return "data/JPLEPH";
 }
 
-std::string catalog_path(const argparse::ArgumentParser& p) {
-  if (auto c = p.get<std::string>("--catalog"); !c.empty()) return c;
+std::string catalog_env_or_default() {
   if (const char* env = std::getenv("LIBASTRO_CATALOG")) return env;
   return "data/hip2.dat";
+}
+
+// `star` uses --catalog as a file path; `sky` uses it as a mode, so it resolves
+// the file via catalog_env_or_default() instead.
+std::string catalog_path(const argparse::ArgumentParser& p) {
+  if (auto c = p.get<std::string>("--catalog"); !c.empty()) return c;
+  return catalog_env_or_default();
 }
 
 std::optional<Ephemeris> open_ephem(const argparse::ArgumentParser& p) {
@@ -406,21 +413,59 @@ int run_sky(const argparse::ArgumentParser& a) {
     if (auto o = parse_observer(*os)) obs = *o;
     else { std::fprintf(stderr, "error: bad --observer\n"); return 2; }
   }
+  // Star inclusion: none (default) | iau (411 named) | hipparcos (all).
+  const std::string cat_mode = lower(a.get<std::string>("--include"));
+  if (cat_mode != "none" && cat_mode != "iau" && cat_mode != "hipparcos") {
+    std::fprintf(stderr, "error: --include must be none, iau, or hipparcos\n");
+    return 2;
+  }
+  std::optional<double> max_mag;  // keep stars with hp_mag <= this
+  if (a.is_used("--max-mag")) max_mag = a.get<double>("--max-mag");
+  std::optional<double> min_alt;  // keep objects with altitude >= this
+  if (a.is_used("--min-alt")) min_alt = a.get<double>("--min-alt");
   const bool json = a.get<bool>("--json");
+
+  // Distance is shown in each object's natural unit: km (Moon), AU
+  // (planets/Sun), ly (stars). JSON carries all three.
+  enum class DistUnit { km, au, ly };
+  const double au_km = eph->header().au_km;
+  constexpr double kAuPerLy = 63241.077;
+
   bool first = true;
-  auto jrow = [&](std::string_view name, double ra, double dec, double dist,
-                  double alt, double az) {
-    std::printf("%s{\"object\":%s,\"ra_hours\":%.6f,\"dec_deg\":%.6f,"
-                "\"distance_au\":%.9g,\"altitude_deg\":%.4f,\"azimuth_deg\":%.4f}",
-                first ? "" : ",", jstr(name).c_str(), ra, dec, dist, alt, az);
-    first = false;
+  auto emit = [&](std::string_view name, double ra, double dec, double dist_au,
+                  DistUnit unit, double mag, double alt, double az) {
+    const double dist_km = dist_au * au_km;
+    const double dist_ly = dist_au / kAuPerLy;
+    if (json) {
+      std::printf("%s{\"object\":%s,\"ra_hours\":%.6f,\"dec_deg\":%.6f,"
+                  "\"distance_au\":%.9g,\"distance_km\":%.6g,\"distance_ly\":%.6g",
+                  first ? "" : ",", jstr(name).c_str(), ra, dec, dist_au, dist_km,
+                  dist_ly);
+      if (!std::isnan(mag)) std::printf(",\"hp_mag\":%.3f", mag);
+      std::printf(",\"altitude_deg\":%.4f,\"azimuth_deg\":%.4f}", alt, az);
+      first = false;
+    } else {
+      char dstr[32];
+      switch (unit) {
+        case DistUnit::km: std::snprintf(dstr, sizeof dstr, "%.0f km", dist_km); break;
+        case DistUnit::au: std::snprintf(dstr, sizeof dstr, "%.6f AU", dist_au); break;
+        case DistUnit::ly: std::snprintf(dstr, sizeof dstr, "%.2f ly", dist_ly); break;
+      }
+      char mstr[12] = "";
+      if (!std::isnan(mag)) std::snprintf(mstr, sizeof mstr, "%.2f", mag);
+      std::printf("%-17s %12.6f %13.6f %16s %6s %11.4f %11.4f\n",
+                  std::string(name).c_str(), ra, dec, dstr, mstr, alt, az);
+    }
   };
+
   if (json)
     std::printf("{\"observer\":[%.7g,%.7g,%.7g],\"objects\":[",
                 obs.latitude_deg, obs.longitude_deg, obs.height_m);
   else
-    std::printf("%-8s %12s %13s %16s %11s %11s\n", "Object", "RA(h)", "Dec(deg)",
-                "Dist(AU)", "Alt(deg)", "Az(deg)");
+    std::printf("%-17s %12s %13s %16s %6s %11s %11s\n", "Object", "RA(h)",
+                "Dec(deg)", "Distance", "Mag", "Alt(deg)", "Az(deg)");
+
+  // Solar-system bodies (always included).
   const Point bodies[] = {Point::mercury, Point::venus,  Point::mars,
                           Point::jupiter, Point::saturn, Point::uranus,
                           Point::neptune, Point::pluto,  Point::sun,
@@ -432,14 +477,50 @@ int run_sky(const argparse::ArgumentParser& a) {
     auto hor = equ2hor(ts->ut1, ts->delta_t, Accuracy::full, PolarMotion{}, obs,
                        sky->ra_hours, sky->dec_deg, Refraction::from_location);
     const double alt = 90.0 - hor.zenith_distance_deg;
-    if (json)
-      jrow(to_string(b), sky->ra_hours, sky->dec_deg, sky->distance_au, alt,
-           hor.azimuth_deg);
-    else
-      std::printf("%-8s %12.6f %13.6f %16.9f %11.4f %11.4f\n",
-                  std::string(to_string(b)).c_str(), sky->ra_hours, sky->dec_deg,
-                  sky->distance_au, alt, hor.azimuth_deg);
+    if (min_alt && alt < *min_alt) continue;
+    const DistUnit unit = (b == Point::moon) ? DistUnit::km : DistUnit::au;
+    emit(to_string(b), sky->ra_hours, sky->dec_deg, sky->distance_au, unit,
+         std::numeric_limits<double>::quiet_NaN(), alt, hor.azimuth_deg);
   }
+
+  // Catalogue stars (optional). Magnitude is a cheap pre-filter applied before
+  // the expensive place(), so `--catalog hipparcos --max-mag N` stays fast.
+  if (cat_mode != "none") {
+    const std::string cpath = catalog_path(a);
+    auto cat = StarCatalog::load_hipparcos(cpath);
+    if (!cat) {
+      std::fprintf(stderr, "error: cannot load catalogue '%s': %s\n"
+                           "(run scripts/fetch_catalog.sh or set LIBASTRO_CATALOG)\n",
+                   cpath.c_str(), std::string(to_string(cat.error())).c_str());
+      return 1;
+    }
+    if (cat_mode == "hipparcos" && !max_mag)
+      std::fprintf(stderr, "note: placing all %zu Hipparcos stars; add --max-mag "
+                           "to filter and speed this up\n", cat->size());
+    for (const CatalogStar& cs : cat->stars()) {
+      const auto iau = name_for_hip(cs.hip);
+      if (cat_mode == "iau" && !iau) continue;  // named stars only
+      if (max_mag && (std::isnan(cs.hp_mag) || cs.hp_mag > *max_mag)) continue;
+      auto sky = place(*eph, cs.astrometry, ts->tt, ts->delta_t, obs,
+                       CoordSys::equator_equinox, Accuracy::full);
+      if (!sky) continue;
+      auto hor = equ2hor(ts->ut1, ts->delta_t, Accuracy::full, PolarMotion{}, obs,
+                         sky->ra_hours, sky->dec_deg, Refraction::from_location);
+      const double alt = 90.0 - hor.zenith_distance_deg;
+      if (min_alt && alt < *min_alt) continue;
+      std::string name;
+      if (iau) {
+        name = std::string(*iau);
+      } else {
+        char buf[24];
+        std::snprintf(buf, sizeof buf, "HIP %d", cs.hip);
+        name = buf;
+      }
+      emit(name, sky->ra_hours, sky->dec_deg, parallax_distance_au(cs.astrometry),
+           DistUnit::ly, cs.hp_mag, alt, hor.azimuth_deg);
+    }
+  }
+
   if (json) std::printf("]}\n");
   return 0;
 }
@@ -843,9 +924,17 @@ int main(int argc, char** argv) {
   with_ephem(star);
 
   argparse::ArgumentParser sky("sky");
-  sky.add_description("Planet table (RA/Dec/dist and alt/az) for an observer.");
+  sky.add_description("What's in the sky: Sun, Moon, planets, and (optionally) catalogue stars.");
   sky.add_argument("datetime").help("UTC or 'now'");
   sky.add_argument("--observer").help("lat,lon,height (default: Seattle)");
+  sky.add_argument("--include").default_value(std::string{"none"})
+      .help("stars to include: none (default) | iau (411 named) | hipparcos (all)");
+  sky.add_argument("--catalog").default_value(std::string{})
+      .help("path to hip2.dat (else $LIBASTRO_CATALOG or data/hip2.dat)");
+  sky.add_argument("--max-mag").scan<'g', double>()
+      .help("include only stars with Hp magnitude <= this (i.e. this bright or brighter)");
+  sky.add_argument("--min-alt").scan<'g', double>()
+      .help("include only objects at least this many degrees above the horizon");
   with_timezone(sky);
   with_ephem(sky);
 

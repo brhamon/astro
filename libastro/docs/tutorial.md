@@ -180,7 +180,9 @@ The `astro` tool (built by default) covers the same ground without writing code:
 export LIBASTRO_EPHEMERIS=$PWD/data/JPLEPH
 build/cli/astro state   mars 2026-07-11 --center sun
 build/cli/astro place   jupiter 2026-07-11T04:00 --observer 47.61,-122.33,10
-build/cli/astro sky     2026-07-11T04:00 --observer 47.61,-122.33,10
+build/cli/astro sky     2026-07-11T04:00 --observer 47.61,-122.33,10       # Sun/Moon/planets
+build/cli/astro sky     now --observer 47.61,-122.33,10 \
+                        --include iau --min-alt 0 --max-mag 3              # + named stars up now
 build/cli/astro rise    sun 2026-07-11 --observer 47.61,-122.33,10 --horizon sun -n 4
 build/cli/astro seasons 2026-01-01 -n 4
 build/cli/astro apsides earth 2026-01-01 -n 4
