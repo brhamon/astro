@@ -44,8 +44,14 @@ generators in `test/gen/` are the oracles; see `test/`).
   public API (`utc_time_scales` → `place` → `equ2hor`), reproducing the legacy
   `planets` core including its Polaris line. ✅
 - **`astro` CLI** — one multi-command tool exercising the whole surface (`state`,
-  `place`, `sky`, `rise`, `seasons`, `apsides`, `time`, `constant`, `info`),
-  built on a vendored header-only argument parser (`third_party/argparse`). ✅
+  `place`, `star`, `sky`, `rise`, `seasons`, `apsides`, `moon`, `time`,
+  `constant`, `info`), built on a vendored header-only argument parser
+  (`third_party/argparse`). Civil time in/out honours `--timezone`; any command
+  takes `--json`. ✅
+- **Star catalogue** — `StarCatalog::load_hipparcos` loads the Hipparcos
+  re-reduction (van Leeuwen 2007, 117955 stars, `scripts/fetch_catalog.sh`),
+  converts its radian J1991.25 positions to J2000.0, and feeds `place()`;
+  `astro star <HIP>` places one. ✅
 
 - **Packaging** — installs as a CMake package: `find_package(astro CONFIG)`
   gives you the `astro::astro` target (see
@@ -198,8 +204,8 @@ src/                      implementations
 examples/                 planets: end-to-end demo over the public API
 cli/                      astro: multi-command CLI over the public API
 tools/                    extract_nutation_tables.py (IAU 2000 series -> src/)
-scripts/                  fetch_ephemeris.sh, vendor_mdspan.sh
-data/                     fetched ephemeris (gitignored)
+scripts/                  fetch_ephemeris.sh, fetch_catalog.sh, vendor_mdspan.sh
+data/                     fetched ephemeris + star catalogue (gitignored)
 test/
   gen/                    oracle generators (gen_vectors: novas.a; gen_constants: con440.c)
   vectors/                committed golden vectors (NOVAS-free build-sanity tier)

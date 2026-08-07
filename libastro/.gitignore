@@ -7,6 +7,8 @@
 /data/JPLEPH
 /data/linux_p*.4*
 /data/lnxm*.4*
+/data/hip2.dat
+/data/hip2.dat.gz
 
 # Vendored dependency source (fetched via scripts/vendor_mdspan.sh).
 # Checked in only if you deliberately commit it; ignored by default so the

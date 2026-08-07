@@ -53,7 +53,7 @@ endif()
 
 # --- Test executables --------------------------------------------------------
 foreach(t ephemeris replay constants place star nutation hor time ecl tropical
-          horizon apsides lunar)
+          horizon apsides lunar catalog)
   add_executable(test_${t} unit/test_${t}.cpp)
   target_link_libraries(test_${t} PRIVATE astro::astro)
 endforeach()
@@ -65,6 +65,14 @@ add_test(NAME tropical COMMAND test_tropical)
 add_test(NAME horizon COMMAND test_horizon)
 add_test(NAME apsides COMMAND test_apsides)
 add_test(NAME lunar COMMAND test_lunar)
+
+# Star catalogue: self-consistency + known stars; needs the fetched Hipparcos
+# file (data/hip_main.dat via scripts/fetch_catalog.sh). Skips (exit 0) if absent.
+set(_hipcat "${CMAKE_CURRENT_SOURCE_DIR}/../data/hip2.dat")
+add_test(NAME catalog COMMAND test_catalog)
+if(EXISTS "${_hipcat}")
+  set_tests_properties(catalog PROPERTIES ENVIRONMENT "LIBASTRO_CATALOG=${_hipcat}")
+endif()
 
 # --- Oracle-backed numeric tests: regenerate if possible, else golden --------
 # each: gen target, regenerated CSV, golden CSV, fixture name

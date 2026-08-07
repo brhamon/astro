@@ -14,6 +14,7 @@ binary ephemeris.
 
 ```sh
 ./scripts/fetch_ephemeris.sh        # curls DE440 into data/JPLEPH (verifies sha256)
+./scripts/fetch_catalog.sh          # optional: Hipparcos star catalogue for `astro star`
 cmake -B build                      # -G Ninja optional
 cmake --build build                 # produces build/libastro.a
 ```
@@ -187,6 +188,7 @@ build/cli/astro moon    now                                     # phase, illumin
 build/cli/astro moon    now --observer 47.61,-122.33,10         # topocentric
 build/cli/astro moon    now -n 4                                # next new/quarters/full
 build/cli/astro moon    now --back -n 4                         # previous phase moments
+build/cli/astro star    32349 now --observer 47.61,-122.33,10   # Sirius (needs fetch_catalog.sh)
 ```
 
 Any command that takes a civil time also accepts `--timezone` (an IANA name,

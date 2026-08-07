@@ -28,6 +28,7 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 include(mdspan)
 
 add_library(astro
+  src/catalog.cpp
   src/ephemeris.cpp
   src/nutation.cpp
   src/phenomena.cpp

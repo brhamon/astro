@@ -18,6 +18,7 @@
 #include <argparse/argparse.hpp>
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -31,6 +32,7 @@
 #include <utility>
 #include <vector>
 
+#include "astro/catalog.hpp"
 #include "astro/ephemeris.hpp"
 #include "astro/phenomena.hpp"
 #include "astro/reductions.hpp"
@@ -49,6 +51,12 @@ std::string ephem_path(const argparse::ArgumentParser& p) {
   if (auto e = p.get<std::string>("--ephemeris"); !e.empty()) return e;
   if (const char* env = std::getenv("LIBASTRO_EPHEMERIS")) return env;
   return "data/JPLEPH";
+}
+
+std::string catalog_path(const argparse::ArgumentParser& p) {
+  if (auto c = p.get<std::string>("--catalog"); !c.empty()) return c;
+  if (const char* env = std::getenv("LIBASTRO_CATALOG")) return env;
+  return "data/hip2.dat";
 }
 
 std::optional<Ephemeris> open_ephem(const argparse::ArgumentParser& p) {
@@ -432,20 +440,6 @@ int run_sky(const argparse::ArgumentParser& a) {
                   std::string(to_string(b)).c_str(), sky->ra_hours, sky->dec_deg,
                   sky->distance_au, alt, hor.azimuth_deg);
   }
-  const Star polaris{2.5303010278, 89.2641094444, 3442.95, -11.8, 7.56, -17.4};
-  if (auto sky = place(*eph, polaris, ts->tt, ts->delta_t, obs,
-                       CoordSys::equator_equinox, Accuracy::full)) {
-    auto hor = equ2hor(ts->ut1, ts->delta_t, Accuracy::full, PolarMotion{}, obs,
-                       sky->ra_hours, sky->dec_deg, Refraction::from_location);
-    const double alt = 90.0 - hor.zenith_distance_deg;
-    if (json)
-      jrow("Polaris", sky->ra_hours, sky->dec_deg, parallax_distance_au(polaris),
-           alt, hor.azimuth_deg);
-    else
-      std::printf("%-8s %12.6f %13.6f %16.6e %11.4f %11.4f\n", "Polaris",
-                  sky->ra_hours, sky->dec_deg, parallax_distance_au(polaris),
-                  alt, hor.azimuth_deg);
-  }
   if (json) std::printf("]}\n");
   return 0;
 }
@@ -688,6 +682,83 @@ int run_moon(const argparse::ArgumentParser& a) {
   return 0;
 }
 
+int run_star(const argparse::ArgumentParser& a) {
+  auto eph = open_ephem(a);
+  if (!eph) return 1;
+  const auto* zone = resolve_zone(a);
+  if (!zone) return 2;
+  auto ts = parse_utc(a.get<std::string>("datetime"), zone);
+  if (!ts) return 2;
+
+  const std::string ident = a.get<std::string>("id");
+  int hip = 0;
+  const auto [p, ec] =
+      std::from_chars(ident.data(), ident.data() + ident.size(), hip);
+  if (ec != std::errc{} || p != ident.data() + ident.size()) {
+    std::fprintf(stderr, "error: '%s' is not a HIP number "
+                         "(name lookup is not yet supported)\n", ident.c_str());
+    return 2;
+  }
+
+  const std::string cpath = catalog_path(a);
+  auto cat = StarCatalog::load_hipparcos(cpath);
+  if (!cat) {
+    std::fprintf(stderr, "error: cannot load catalogue '%s': %s\n"
+                         "(run scripts/fetch_catalog.sh or set LIBASTRO_CATALOG)\n",
+                 cpath.c_str(), std::string(to_string(cat.error())).c_str());
+    return 1;
+  }
+  const CatalogStar* cs = cat->by_hip(hip);
+  if (!cs) { std::fprintf(stderr, "error: HIP %d not in catalogue\n", hip); return 1; }
+
+  const CoordSys sys = parse_coord(a.get<std::string>("--coord"));
+  std::optional<SurfaceObserver> obs;
+  std::expected<SkyPos, EphError> sky;
+  if (auto os = a.present<std::string>("--observer")) {
+    obs = parse_observer(*os);
+    if (!obs) { std::fprintf(stderr, "error: bad --observer\n"); return 2; }
+    sky = place(*eph, cs->astrometry, ts->tt, ts->delta_t, *obs, sys, Accuracy::full);
+  } else {
+    sky = place(*eph, cs->astrometry, ts->tt, ts->delta_t, sys, Accuracy::full);
+  }
+  if (!sky) { std::fprintf(stderr, "error: %s\n", std::string(to_string(sky.error())).c_str()); return 1; }
+
+  const double dist_ly = parallax_distance_au(cs->astrometry) / 63241.077;  // AU/ly
+  double alt = 0.0, az = 0.0;
+  const bool have_altaz = obs.has_value();
+  if (obs) {
+    auto hor = equ2hor(ts->ut1, ts->delta_t, Accuracy::full, PolarMotion{}, *obs,
+                       sky->ra_hours, sky->dec_deg, Refraction::from_location);
+    alt = 90.0 - hor.zenith_distance_deg;
+    az = hor.azimuth_deg;
+  }
+
+  if (a.get<bool>("--json")) {
+    std::printf("{\"hip\":%d,\"hp_mag\":", cs->hip);
+    if (std::isnan(cs->hp_mag)) std::printf("null"); else std::printf("%.3f", cs->hp_mag);
+    std::printf(",\"bv\":");
+    if (std::isnan(cs->bv)) std::printf("null"); else std::printf("%.3f", cs->bv);
+    std::printf(",\"vi\":");
+    if (std::isnan(cs->vi)) std::printf("null"); else std::printf("%.3f", cs->vi);
+    std::printf(",\"ra_hours\":%.6f,\"dec_deg\":%.6f,\"distance_ly\":%.4g",
+                sky->ra_hours, sky->dec_deg, dist_ly);
+    if (have_altaz)
+      std::printf(",\"altitude_deg\":%.4f,\"azimuth_deg\":%.4f", alt, az);
+    std::printf("}\n");
+    return 0;
+  }
+  std::printf("HIP %d", cs->hip);
+  if (!std::isnan(cs->hp_mag)) std::printf("  Hp=%.2f", cs->hp_mag);
+  if (!std::isnan(cs->bv)) std::printf("  B-V=%.2f", cs->bv);
+  std::printf("\n");
+  std::printf("  RA  = %.6f h\n", sky->ra_hours);
+  std::printf("  Dec = %.6f deg\n", sky->dec_deg);
+  std::printf("  distance = %.2f ly\n", dist_ly);
+  if (have_altaz)
+    std::printf("  Alt = %.4f deg  Az = %.4f deg\n", alt, az);
+  return 0;
+}
+
 }  // namespace
 
 int main(int argc, char** argv) {
@@ -749,8 +820,20 @@ int main(int argc, char** argv) {
   with_timezone(place_cmd);
   with_ephem(place_cmd);
 
+  argparse::ArgumentParser star("star");
+  star.add_description("Place a Hipparcos catalogue star by HIP number.");
+  star.add_argument("id").help("Hipparcos number (HIP)");
+  star.add_argument("datetime").help("UTC or 'now'");
+  star.add_argument("--observer").help("lat,lon,height (deg,deg,m); adds alt/az");
+  star.add_argument("--coord").default_value(std::string{"apparent"})
+      .help("apparent | gcrs | astrometric | cio");
+  star.add_argument("--catalog").default_value(std::string{})
+      .help("path to hip_main.dat (else $LIBASTRO_CATALOG or data/hip_main.dat)");
+  with_timezone(star);
+  with_ephem(star);
+
   argparse::ArgumentParser sky("sky");
-  sky.add_description("Planet+Polaris table (RA/Dec/dist and alt/az) for an observer.");
+  sky.add_description("Planet table (RA/Dec/dist and alt/az) for an observer.");
   sky.add_argument("datetime").help("UTC or 'now'");
   sky.add_argument("--observer").help("lat,lon,height (default: Seattle)");
   with_timezone(sky);
@@ -796,8 +879,8 @@ int main(int argc, char** argv) {
   with_ephem(moon);
 
   for (argparse::ArgumentParser* p :
-       {&info, &time_cmd, &constant, &state, &place_cmd, &sky, &rise, &seasons,
-        &apsides_cmd, &moon})
+       {&info, &time_cmd, &constant, &state, &place_cmd, &star, &sky, &rise,
+        &seasons, &apsides_cmd, &moon})
     with_json(*p);
 
   program.add_subparser(info);
@@ -805,6 +888,7 @@ int main(int argc, char** argv) {
   program.add_subparser(constant);
   program.add_subparser(state);
   program.add_subparser(place_cmd);
+  program.add_subparser(star);
   program.add_subparser(sky);
   program.add_subparser(rise);
   program.add_subparser(seasons);
@@ -824,6 +908,7 @@ int main(int argc, char** argv) {
   if (program.is_subcommand_used("constant")) return run_constant(constant);
   if (program.is_subcommand_used("state")) return run_state(state);
   if (program.is_subcommand_used("place")) return run_place(place_cmd);
+  if (program.is_subcommand_used("star")) return run_star(star);
   if (program.is_subcommand_used("sky")) return run_sky(sky);
   if (program.is_subcommand_used("rise")) return run_rise(rise);
   if (program.is_subcommand_used("seasons")) return run_seasons(seasons);

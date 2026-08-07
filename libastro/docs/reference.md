@@ -257,6 +257,36 @@ double sun_apparent_longitude(const Ephemeris&, TtInstant t);         // [0,360)
 
 ---
 
+## Star catalogue (`astro/catalog.hpp`)
+
+A queryable, in-memory collection of catalogued stars whose astrometry feeds
+straight into `place()`.
+
+```cpp
+struct CatalogStar {
+  Star  astrometry;   // ICRS, epoch J2000.0 -- pass straight to place()
+  int   hip;          // Hipparcos number
+  float hp_mag;       // Hipparcos Hp magnitude (broadband, ~ Johnson V)
+  float bv, vi;       // B-V, V-I colours (NaN if absent)
+};
+
+class StarCatalog {
+  static std::expected<StarCatalog, EphError> load_hipparcos(const std::filesystem::path&);
+  std::size_t size() const;
+  const std::vector<CatalogStar>& stars() const;
+  const CatalogStar* by_hip(int) const;   // nullptr if absent
+};
+```
+
+`load_hipparcos` reads the **Hipparcos re-reduction** (van Leeuwen 2007, CDS
+`I/311` `hip2.dat`, 117955 stars; fetch with `scripts/fetch_catalog.sh`) — the
+reprocessing with markedly better parallaxes. Positions are given in **radians**
+at epoch **J1991.25**; the loader converts to degrees and propagates each to
+**J2000.0** by proper motion, so `astrometry` is a J2000 entry ready for
+`place()`. Being an astrometric catalogue it carries the Hipparcos **Hp**
+magnitude and colours (no Johnson V or spectral type), and no radial velocity
+(so `radial_velocity_km_s` is 0).
+
 ## The `astro` CLI
 
 One tool over the whole surface (built with `-DLIBASTRO_BUILD_CLI=ON`, default
@@ -286,7 +316,8 @@ stdout is always clean JSON.
 | `astro constant [NAME…]` | named record-2 constants; omit names to list them all (see [constants.md](constants.md)) |
 | `astro state <body> <utc> [--center ssb\|sun\|earth\|emb]` | Layer 0 state vector |
 | `astro place <body> <utc> [--observer lat,lon,h] [--coord apparent\|gcrs\|astrometric\|cio] [--accuracy full\|reduced]` | apparent place |
-| `astro sky <utc> [--observer lat,lon,h]` | planet + Polaris table (RA/Dec/dist, alt/az) |
+| `astro star <HIP> <utc> [--observer lat,lon,h] [--coord …] [--catalog PATH]` | place a Hipparcos catalogue star (RA/Dec, distance, alt/az) |
+| `astro sky <utc> [--observer lat,lon,h]` | solar-system table: Sun, Moon, planets (RA/Dec/dist, alt/az). For stars use `astro star`. |
 | `astro rise <body> <utc> --observer lat,lon,h [--horizon …] [-n N] [--back]` | rise/transit/set stream |
 | `astro seasons <utc> [-n N] [--back]` | equinox/solstice stream |
 | `astro apsides <body> <utc> [--center sun\|earth] [-n N] [--back]` | perihelion/aphelion or perigee/apogee |
